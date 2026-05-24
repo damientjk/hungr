@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Hungr",
+    "slug": "hungr",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FF4F00"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.hungr.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Hungr uses your location to find restaurants near you."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FF4F00"
+      },
+      "package": "com.hungr.app",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Hungr uses your location to find restaurants near you."
+        }
+      ]
+    ],
+    "scheme": "hungr",
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    }
+  }
+}
