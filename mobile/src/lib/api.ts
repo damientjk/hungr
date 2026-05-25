@@ -1,6 +1,9 @@
+import { Platform } from "react-native";
 import { supabase } from "./supabase";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+const API_URL = Platform.OS === "web"
+  ? ""
+  : (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
 async function getAuthHeader(): Promise<string> {
   const { data } = await supabase.auth.getSession();
@@ -55,6 +58,8 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ restaurantId, direction }),
       }),
+    resetSwipes: () =>
+      request("/api/restaurants/swipes", { method: "DELETE" }),
   },
   sessions: {
     create: (payload: {

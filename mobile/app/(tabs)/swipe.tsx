@@ -22,6 +22,7 @@ export default function SwipeScreen() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [swiping, setSwiping] = useState(false);
 
   const position = useRef(new Animated.ValueXY()).current;
   const rotation = position.x.interpolate({
@@ -31,7 +32,7 @@ export default function SwipeScreen() {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => !swiping,
       onPanResponderMove: (_evt, gestureState) => {
         position.setValue({ x: gestureState.dx, y: gestureState.dy });
       },
@@ -72,6 +73,8 @@ export default function SwipeScreen() {
   }
 
   function swipeCard(direction: SwipeDirection) {
+    if (swiping) return;
+    setSwiping(true);
     const toX = direction === "like" ? width * 1.5 : -width * 1.5;
     Animated.timing(position, {
       toValue: { x: toX, y: 0 },
@@ -84,6 +87,7 @@ export default function SwipeScreen() {
       }
       position.setValue({ x: 0, y: 0 });
       setCurrentIndex((i) => i + 1);
+      setSwiping(false);
     });
   }
 

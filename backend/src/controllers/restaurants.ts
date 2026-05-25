@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { supabase } from "../lib/supabase";
+import { fetchAllNearbyRestaurants } from "../lib/places";
 import { AuthRequest } from "../middleware/auth";
 
 const NearbySchema = z.object({
@@ -19,21 +20,33 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
 
   const { latitude, longitude, radius, cuisine } = parsed.data;
 
-  // Fetch restaurants from Supabase, excluding ones the user already swiped
-  let query = supabase
-    .from("restaurants")
-    .select("*")
-    .not(
-      "id",
-      "in",
-      `(select restaurant_id from swipes where user_id = '${req.userId}')`
-    );
+  // Check how many restaurants we already have near this location
+  const { data: existing } = await supabase.rpc("restaurants_near_point", {
+    lat: latitude,
+    lng: longitude,
+    radius_meters: radius,
+    exclude_user_id: req.userId,
+    cuisine_filter: null,
+  });
+  const nearbyCount = existing?.length ?? 0;
 
-  if (cuisine) {
-    query = query.contains("cuisines", [cuisine]);
+  // Fetch from Google Places if we don't have enough local results
+  if (nearbyCount < 20) {
+    try {
+      const allPlaces = await fetchAllNearbyRestaurants(latitude, longitude, radius);
+      console.log(`Fetched ${allPlaces.length} restaurants from Places API`);
+      if (allPlaces.length > 0) {
+        const { error: upsertError } = await supabase
+          .from("restaurants")
+          .upsert(allPlaces, { onConflict: "place_id", ignoreDuplicates: false });
+        if (upsertError) console.error("Upsert error:", upsertError);
+      }
+    } catch (e) {
+      console.error("Places API fetch failed:", e);
+    }
   }
 
-  // PostGIS distance filter via RPC
+  // Query from Supabase via PostGIS RPC, excluding already-swiped restaurants
   const { data, error } = await supabase.rpc("restaurants_near_point", {
     lat: latitude,
     lng: longitude,
@@ -43,6 +56,7 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
   });
 
   if (error) {
+    console.error("RPC error:", error);
     res.status(500).json({ error: "Failed to fetch restaurants" });
     return;
   }
@@ -72,7 +86,23 @@ export async function recordSwipe(req: AuthRequest, res: Response) {
   });
 
   if (error) {
+    console.error("Swipe error:", error);
     res.status(500).json({ error: "Failed to record swipe" });
+    return;
+  }
+
+  res.json({ success: true });
+}
+
+export async function resetSwipes(req: AuthRequest, res: Response) {
+  const { error } = await supabase
+    .from("swipes")
+    .delete()
+    .eq("user_id", req.userId);
+
+  if (error) {
+    console.error("Reset swipes error:", error);
+    res.status(500).json({ error: "Failed to reset swipes" });
     return;
   }
 
@@ -88,9 +118,10 @@ export async function getLikedRestaurants(req: AuthRequest, res: Response) {
     .order("swiped_at", { ascending: false });
 
   if (error) {
+    console.error("Liked restaurants error:", error);
     res.status(500).json({ error: "Failed to fetch liked restaurants" });
     return;
   }
 
-  res.json({ restaurants: data });
+  res.json({ restaurants: data.map((d: any) => d.restaurants) });
 }

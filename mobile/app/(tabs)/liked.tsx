@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   View,
   Text,
@@ -15,9 +16,11 @@ export default function LikedScreen() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchLiked();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchLiked();
+    }, [])
+  );
 
   async function fetchLiked() {
     setLoading(true);
