@@ -69,10 +69,10 @@ Start a session
 ```
 ┌─────────────────────┐        ┌──────────────────────────┐
 │   Expo Mobile App   │◄──────►│   Express Backend (3000) │
-│  (React Native)     │  REST  │   + Auth middleware       │
+│  (React Native)     │  REST  │   + Auth middleware      |
 └─────────────────────┘        └────────────┬─────────────┘
                                             │ service role
-                                ┌───────────▼─────────────┐
+                                ┌───────────▼──────────────┐
                                 │  Supabase (PostgreSQL)   │
                                 │  • restaurants           │
                                 │  • sessions              │
@@ -80,7 +80,7 @@ Start a session
                                 │  • session_restaurants   │
                                 │  • swipes                │
                                 │  • bookmarks             │
-                                └─────────────────────────┘
+                                └──────────────────────────┘
 ```
 
 ### Key Design Decisions

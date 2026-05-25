@@ -17,6 +17,7 @@ export function useLocation() {
       if (!navigator.geolocation) {
         setError("Geolocation is not supported by your browser");
         setLoading(false);
+        Alert.alert("Location Not Supported", "Your browser does not support geolocation.");
         return;
       }
       navigator.geolocation.getCurrentPosition(
@@ -27,6 +28,10 @@ export function useLocation() {
         () => {
           setError("Location permission denied");
           setLoading(false);
+          Alert.alert(
+            "Location Required",
+            "Hungr needs your location to find nearby restaurants. Please enable location access in your browser settings and refresh the page."
+          );
         }
       );
       return;
