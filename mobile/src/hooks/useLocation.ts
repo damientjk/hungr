@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Platform } from "react-native";
+import { Platform, Alert, Linking } from "react-native";
 import * as Location from "expo-location";
 
 export interface Coords {
@@ -33,10 +33,22 @@ export function useLocation() {
     }
 
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         setError("Location permission denied");
         setLoading(false);
+
+        // If permission was permanently denied, prompt the user to open Settings
+        if (!canAskAgain) {
+          Alert.alert(
+            "Location Required",
+            "Hungr needs your location to find nearby restaurants. Please enable it in Settings.",
+            [
+              { text: "Not Now", style: "cancel" },
+              { text: "Open Settings", onPress: () => Linking.openSettings() },
+            ]
+          );
+        }
         return;
       }
       const location = await Location.getCurrentPositionAsync({

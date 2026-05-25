@@ -9,6 +9,7 @@ const NearbySchema = z.object({
   longitude: z.coerce.number().min(-180).max(180),
   radius: z.coerce.number().min(100).max(50000).default(5000),
   cuisine: z.string().optional(),
+  limit: z.coerce.number().min(1).max(100).optional(),
 });
 
 export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
@@ -18,7 +19,7 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
     return;
   }
 
-  const { latitude, longitude, radius, cuisine } = parsed.data;
+  const { latitude, longitude, radius, cuisine, limit } = parsed.data;
 
   // Check how many restaurants we already have near this location
   const { data: existing } = await supabase.rpc("restaurants_near_point", {
@@ -61,12 +62,14 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
     return;
   }
 
-  res.json({ restaurants: data });
+  const results = limit ? (data ?? []).slice(0, limit) : (data ?? []);
+  res.json({ restaurants: results });
 }
 
 const SwipeSchema = z.object({
   restaurantId: z.string().uuid(),
   direction: z.enum(["like", "dislike"]),
+  sessionId: z.string().uuid(),
 });
 
 export async function recordSwipe(req: AuthRequest, res: Response) {
@@ -76,14 +79,18 @@ export async function recordSwipe(req: AuthRequest, res: Response) {
     return;
   }
 
-  const { restaurantId, direction } = parsed.data;
+  const { restaurantId, direction, sessionId } = parsed.data;
 
-  const { error } = await supabase.from("swipes").upsert({
-    user_id: req.userId,
-    restaurant_id: restaurantId,
-    direction,
-    swiped_at: new Date().toISOString(),
-  });
+  const { error } = await supabase.from("swipes").upsert(
+    {
+      user_id: req.userId,
+      restaurant_id: restaurantId,
+      session_id: sessionId,
+      direction,
+      swiped_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id, restaurant_id, session_id" }
+  );
 
   if (error) {
     console.error("Swipe error:", error);

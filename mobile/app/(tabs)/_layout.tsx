@@ -1,8 +1,10 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { SessionProvider } from "@/src/lib/SessionContext";
 
 export default function TabLayout() {
   return (
+    <SessionProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -16,11 +18,11 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="swipe"
+        name="discover"
         options={{
           title: "Discover",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flame" size={size} color={color} />
+            <Ionicons name="compass" size={size} color={color} />
           ),
         }}
       />
@@ -36,9 +38,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="liked"
         options={{
-          title: "Saved",
+          title: "Bookmarks",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="heart" size={size} color={color} />
+            <Ionicons name="bookmark" size={size} color={color} />
           ),
         }}
       />
@@ -51,6 +53,11 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="swipe"
+        options={{ href: null }}
+      />
     </Tabs>
+    </SessionProvider>
   );
 }
