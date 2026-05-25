@@ -19,6 +19,3 @@ CREATE POLICY "session_restaurants_select" ON session_restaurants
     )
   );
 
--- Grant privileges that Supabase doesn't set automatically for SQL-created tables
-GRANT ALL ON public.session_restaurants TO service_role;
-GRANT SELECT ON public.session_restaurants TO authenticated;
