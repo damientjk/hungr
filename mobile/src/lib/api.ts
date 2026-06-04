@@ -1,15 +1,37 @@
 import { Platform } from "react-native";
 import { supabase } from "./supabase";
 
-const API_URL = Platform.OS === "web"
-  ? ""
-  : (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
+/**
+ * Web: use same-origin `/api` — Metro proxies to EXPO_PUBLIC_API_URL (see metro.config.js).
+ * Native: call the backend URL directly.
+ */
+const API_URL =
+  Platform.OS === "web"
+    ? ""
+    : (
+        process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000"
+      ).replace(/\/$/, "");
 
 async function getAuthHeader(): Promise<string> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error("Not authenticated");
   return `Bearer ${token}`;
+}
+
+async function parseJsonResponse<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text) return {} as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    if (text.trimStart().startsWith("<")) {
+      throw new Error(
+        "Backend returned HTML instead of JSON. Check that the API is running and EXPO_PUBLIC_API_URL points to it (e.g. http://localhost:3000)."
+      );
+    }
+    throw new Error(text.slice(0, 120) || "Invalid response from server");
+  }
 }
 
 async function request<T>(
@@ -26,12 +48,13 @@ async function request<T>(
     },
   });
 
+  const body = await parseJsonResponse<{ error?: string } & T>(res);
+
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? `Request failed: ${res.status}`);
   }
 
-  return res.json();
+  return body;
 }
 
 export const api = {

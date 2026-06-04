@@ -1,14 +1,11 @@
 import { useState } from "react";
-import {
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { useAuth } from "@/src/hooks/useAuth";
+import { AuthLayout, authInputStyle, PrimaryButton } from "@/src/components/ui";
+import { colors } from "@/src/theme/colors";
+import { fontFamily } from "@/src/theme/typography";
+import { spacing } from "@/src/theme/spacing";
 
 export default function SignupScreen() {
   const { signUpWithEmail } = useAuth();
@@ -35,42 +32,33 @@ export default function SignupScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <Text style={styles.logo}>🍔 Hungr</Text>
-      <Text style={styles.tagline}>Create your account</Text>
-
+    <AuthLayout subtitle="Create your account">
       <TextInput
-        style={styles.input}
+        style={authInputStyle.input}
         placeholder="Email"
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textLight}
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
       />
       <TextInput
-        style={styles.input}
+        style={authInputStyle.input}
         placeholder="Password"
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textLight}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
       />
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && <Text style={authInputStyle.error}>{error}</Text>}
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
+      <PrimaryButton
+        title={loading ? "Creating account..." : "Sign Up"}
         onPress={handleSignup}
+        loading={loading}
         disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? "Creating account..." : "Sign Up"}
-        </Text>
-      </TouchableOpacity>
+      />
 
       <Link href="/(auth)/login" asChild>
         <TouchableOpacity style={styles.linkButton}>
@@ -79,49 +67,12 @@ export default function SignupScreen() {
           </Text>
         </TouchableOpacity>
       </Link>
-    </KeyboardAvoidingView>
+    </AuthLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#C94000",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 32,
-  },
-  logo: { fontSize: 48, marginBottom: 8 },
-  tagline: { fontSize: 18, color: "#fff", fontWeight: "600", marginBottom: 48 },
-  input: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    marginBottom: 12,
-    color: "#1a1a1a",
-  },
-  button: {
-    width: "100%",
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  linkButton: { marginTop: 24 },
-  linkText: { color: "#fff", fontSize: 14 },
-  linkBold: { fontWeight: "700" },
-  error: {
-    width: "100%",
-    color: "#fff",
-    backgroundColor: "rgba(0,0,0,0.25)",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    fontSize: 14,
-  },
+  linkButton: { marginTop: spacing.lg, alignItems: "center" },
+  linkText: { color: colors.textMuted, fontSize: 14, fontFamily: fontFamily.regular },
+  linkBold: { fontFamily: fontFamily.bold, color: colors.primary },
 });

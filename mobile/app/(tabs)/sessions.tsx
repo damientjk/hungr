@@ -11,12 +11,16 @@ import {
   Alert,
   Linking,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { api, Restaurant } from "@/src/lib/api";
 import { useSession } from "@/src/lib/SessionContext";
 import { useLocation } from "@/src/hooks/useLocation";
 import { supabase } from "@/src/lib/supabase";
+import { Screen } from "@/src/components/ui/Screen";
+import { colors } from "@/src/theme/colors";
+import { fontFamily } from "@/src/theme/typography";
+import { spacing } from "@/src/theme/spacing";
+import { screenStyles } from "@/src/theme/screenStyles";
 
 export default function SessionsScreen() {
   const { session, setSession } = useSession();
@@ -190,7 +194,7 @@ export default function SessionsScreen() {
     const isSwiping = session.status === "swiping";
 
     return (
-      <SafeAreaView style={styles.container}>
+      <Screen style={styles.container}>
         <Text style={styles.header}>Group Session</Text>
 
         <View style={styles.activeSession}>
@@ -270,7 +274,7 @@ export default function SessionsScreen() {
             </View>
 
             {matchesLoading ? (
-              <ActivityIndicator color="#FF4F00" style={{ marginTop: 16 }} />
+              <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
             ) : !matchResult || (matchResult.matches.length === 0 && !matchResult.topMatch) ? (
               <Text style={styles.noMatchesText}>No matches yet — keep swiping!</Text>
             ) : matchResult.matches.length > 0 ? (
@@ -313,12 +317,12 @@ export default function SessionsScreen() {
         >
           <Text style={styles.leaveText}>Leave session</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Screen style={styles.container}>
       <Text style={styles.header}>Group</Text>
       <Text style={styles.subtitle}>
         Swipe together and find a restaurant everyone agrees on.
@@ -368,113 +372,209 @@ export default function SessionsScreen() {
           <Text style={styles.buttonText}>Join</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f8f8", padding: 16 },
-  header: { fontSize: 28, fontWeight: "800", color: "#1a1a1a", marginBottom: 8 },
-  subtitle: { color: "#666", fontSize: 15, marginBottom: 32 },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#1a1a1a", marginBottom: 12 },
+  container: { flex: 1, padding: spacing.md },
+  header: { ...screenStyles.header, marginBottom: spacing.sm, padding: 0 },
+  subtitle: {
+    color: colors.textMuted,
+    fontSize: 15,
+    fontFamily: fontFamily.regular,
+    marginBottom: spacing.xl,
+  },
+  section: { marginBottom: spacing.lg },
+  sectionTitle: {
+    fontSize: 16,
+    fontFamily: fontFamily.bold,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
   input: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 14,
     fontSize: 16,
-    color: "#1a1a1a",
+    fontFamily: fontFamily.regular,
+    color: colors.text,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: colors.border,
   },
   button: {
-    backgroundColor: "#FF4F00",
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    borderRadius: 28,
     padding: 14,
     alignItems: "center",
   },
-  joinButton: { backgroundColor: "#1a1a1a" },
+  joinButton: { backgroundColor: colors.text },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  divider: { flexDirection: "row", alignItems: "center", marginVertical: 8 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "#e0e0e0" },
-  dividerText: { marginHorizontal: 16, color: "#999" },
-  activeSession: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 24,
-    alignItems: "center",
-    marginBottom: 16,
+  buttonText: {
+    color: "#fff",
+    fontFamily: fontFamily.bold,
+    fontSize: 16,
   },
-  sessionName: { fontSize: 22, fontWeight: "800", color: "#1a1a1a", marginBottom: 16 },
-  inviteLabel: { fontSize: 13, color: "#999", marginBottom: 8 },
+  divider: { flexDirection: "row", alignItems: "center", marginVertical: spacing.sm },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: {
+    marginHorizontal: spacing.md,
+    color: colors.textLight,
+    fontFamily: fontFamily.regular,
+  },
+  activeSession: {
+    backgroundColor: colors.surface,
+    borderRadius: spacing.cardRadius,
+    padding: spacing.lg,
+    alignItems: "center",
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sessionName: {
+    fontSize: 22,
+    fontFamily: fontFamily.extraBold,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  inviteLabel: {
+    fontSize: 13,
+    fontFamily: fontFamily.regular,
+    color: colors.textLight,
+    marginBottom: spacing.sm,
+  },
   inviteCode: {
     fontSize: 40,
-    fontWeight: "800",
+    fontFamily: fontFamily.extraBold,
     letterSpacing: 8,
-    color: "#FF4F00",
-    marginBottom: 16,
+    color: colors.primary,
+    marginBottom: spacing.md,
   },
   shareButton: {
-    backgroundColor: "#FF4F00",
-    borderRadius: 12,
-    paddingHorizontal: 32,
+    backgroundColor: colors.primary,
+    borderRadius: 28,
+    paddingHorizontal: spacing.xl,
     paddingVertical: 12,
   },
-  shareButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  swipingBadge: {
-    backgroundColor: "#fff3ee",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  shareButtonText: {
+    color: "#fff",
+    fontFamily: fontFamily.bold,
+    fontSize: 16,
   },
-  swipingBadgeText: { color: "#FF4F00", fontWeight: "600", fontSize: 14 },
+  swipingBadge: {
+    backgroundColor: colors.tintSurface,
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  swipingBadgeText: {
+    color: colors.primary,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 14,
+  },
   startButton: {
-    backgroundColor: "#FF4F00",
-    borderRadius: 16,
+    backgroundColor: colors.primary,
+    borderRadius: 28,
     padding: 18,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
-  startButtonText: { color: "#fff", fontWeight: "800", fontSize: 18 },
+  startButtonText: {
+    color: "#fff",
+    fontFamily: fontFamily.extraBold,
+    fontSize: 18,
+  },
   waitingBox: {
-    backgroundColor: "#f0f0f0",
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: colors.imagePlaceholder,
+    borderRadius: spacing.cardRadius,
+    padding: spacing.md,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: spacing.md,
     gap: 12,
   },
-  waitingText: { color: "#999", fontSize: 14, textAlign: "center" },
-  refreshBtn: { paddingHorizontal: 20, paddingVertical: 8 },
-  refreshBtnText: { color: "#FF4F00", fontWeight: "700", fontSize: 14 },
+  waitingText: {
+    color: colors.textLight,
+    fontSize: 14,
+    fontFamily: fontFamily.regular,
+    textAlign: "center",
+  },
+  refreshBtn: { paddingHorizontal: 20, paddingVertical: spacing.sm },
+  refreshBtnText: {
+    color: colors.primary,
+    fontFamily: fontFamily.bold,
+    fontSize: 14,
+  },
   matchesSection: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderRadius: spacing.cardRadius,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: spacing.md,
     flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   matchesHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
-  matchesTitle: { fontSize: 18, fontWeight: "700", color: "#1a1a1a" },
-  refreshLink: { color: "#FF4F00", fontWeight: "600", fontSize: 14 },
-  noMatchesText: { color: "#999", fontSize: 14, textAlign: "center", paddingVertical: 16 },
-  matchLabel: { fontSize: 14, fontWeight: "600", color: "#666", marginBottom: 8 },
-  likeCount: { fontSize: 13, color: "#FF4F00", fontWeight: "600", marginTop: 2 },
+  matchesTitle: {
+    fontSize: 18,
+    fontFamily: fontFamily.bold,
+    color: colors.text,
+  },
+  refreshLink: {
+    color: colors.primary,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 14,
+  },
+  noMatchesText: {
+    color: colors.textLight,
+    fontSize: 14,
+    fontFamily: fontFamily.regular,
+    textAlign: "center",
+    paddingVertical: spacing.md,
+  },
+  matchLabel: {
+    fontSize: 14,
+    fontFamily: fontFamily.semiBold,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
+  likeCount: {
+    fontSize: 13,
+    color: colors.primary,
+    fontFamily: fontFamily.semiBold,
+    marginTop: 2,
+  },
   matchItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.border,
   },
-  matchName: { fontSize: 16, fontWeight: "600", color: "#1a1a1a", marginBottom: 4 },
-  matchMeta: { fontSize: 13, color: "#999" },
-  leaveButton: { alignSelf: "center", paddingVertical: 8 },
-  leaveText: { color: "#ff4444", fontSize: 16 },
-  error: { color: "#ff4444", fontSize: 13, marginBottom: 8 },
+  matchName: {
+    fontSize: 16,
+    fontFamily: fontFamily.semiBold,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  matchMeta: {
+    fontSize: 13,
+    fontFamily: fontFamily.regular,
+    color: colors.textLight,
+  },
+  leaveButton: { alignSelf: "center", paddingVertical: spacing.sm },
+  leaveText: {
+    color: colors.destructive,
+    fontSize: 16,
+    fontFamily: fontFamily.semiBold,
+  },
+  error: {
+    color: colors.destructive,
+    fontSize: 13,
+    fontFamily: fontFamily.regular,
+    marginBottom: spacing.sm,
+  },
 });

@@ -1,10 +1,12 @@
-import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { HungrLogo } from "@/src/components/ui/HungrLogo";
+import { colors } from "@/src/theme/colors";
 
 export function LoadingScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>🍔</Text>
-      <ActivityIndicator size="large" color="#fff" style={styles.spinner} />
+      <HungrLogo />
+      <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
     </View>
   );
 }
@@ -12,15 +14,11 @@ export function LoadingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FF4F00",
+    backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
   },
-  logo: {
-    fontSize: 64,
-    marginBottom: 32,
-  },
   spinner: {
-    opacity: 0.8,
+    marginTop: 32,
   },
 });

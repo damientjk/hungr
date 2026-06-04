@@ -1,14 +1,9 @@
 import { useState } from "react";
-import {
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { Text, TextInput } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/src/hooks/useAuth";
+import { AuthLayout, authInputStyle, PrimaryButton } from "@/src/components/ui";
+import { colors } from "@/src/theme/colors";
 
 export default function ResetPasswordScreen() {
   const { updatePassword } = useAuth();
@@ -39,89 +34,36 @@ export default function ResetPasswordScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    <AuthLayout
+      showLogo={false}
+      title="New password"
+      subtitle="Choose a strong password for your account."
     >
-      <Text style={styles.emoji}>🔒</Text>
-      <Text style={styles.title}>New password</Text>
-      <Text style={styles.body}>Choose a strong password for your account.</Text>
-
       <TextInput
-        style={styles.input}
+        style={authInputStyle.input}
         placeholder="New password"
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textLight}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
       />
       <TextInput
-        style={styles.input}
+        style={authInputStyle.input}
         placeholder="Confirm password"
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textLight}
         secureTextEntry
         value={confirm}
         onChangeText={setConfirm}
       />
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && <Text style={authInputStyle.error}>{error}</Text>}
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
+      <PrimaryButton
+        title={loading ? "Updating..." : "Update Password"}
         onPress={handleUpdate}
+        loading={loading}
         disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? "Updating..." : "Update Password"}
-        </Text>
-      </TouchableOpacity>
-    </KeyboardAvoidingView>
+      />
+    </AuthLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#C94000",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 32,
-  },
-  emoji: { fontSize: 56, marginBottom: 16 },
-  title: { fontSize: 28, fontWeight: "800", color: "#fff", marginBottom: 12 },
-  body: {
-    fontSize: 15,
-    color: "rgba(255,255,255,0.85)",
-    textAlign: "center",
-    marginBottom: 32,
-    lineHeight: 22,
-  },
-  input: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    marginBottom: 12,
-    color: "#1a1a1a",
-  },
-  button: {
-    width: "100%",
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  error: {
-    width: "100%",
-    color: "#fff",
-    backgroundColor: "rgba(0,0,0,0.25)",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    fontSize: 14,
-  },
-});

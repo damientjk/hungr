@@ -3,26 +3,29 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
   Animated,
   PanResponder,
   Dimensions,
-  Image,
   Alert,
   Linking,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { api, Restaurant, SwipeDirection } from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
 import { RestaurantCard } from "@/src/components/RestaurantCard";
 import { useSession } from "@/src/lib/SessionContext";
 import { useRouter } from "expo-router";
+import { Screen } from "@/src/components/ui/Screen";
+import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
+import { SwipeActionBar } from "@/src/components/ui/SwipeActionBar";
+import { SwipeHeader } from "@/src/components/ui/SwipeHeader";
+import { colors } from "@/src/theme/colors";
+import { spacing } from "@/src/theme/spacing";
+import { fontFamily } from "@/src/theme/typography";
 
 const { width } = Dimensions.get("window");
 const SWIPE_THRESHOLD = width * 0.3;
 const BATCH_SIZE = 20;
-const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
 
 type Phase = "swiping" | "loading_results" | "waiting" | "results";
 
@@ -32,6 +35,40 @@ interface MatchResult {
   participantCount: number;
   doneCount: number;
   allDone: boolean;
+}
+
+function GateView({
+  emoji,
+  message,
+  primaryLabel,
+  onPrimary,
+  secondaryLabel,
+  onSecondary,
+}: {
+  emoji: string;
+  message: string;
+  primaryLabel: string;
+  onPrimary: () => void;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
+}) {
+  return (
+    <Screen style={styles.gateScreen}>
+      <View style={styles.gateContent}>
+        <Text style={styles.gateEmoji}>{emoji}</Text>
+        <Text style={styles.gateText}>{message}</Text>
+        <PrimaryButton title={primaryLabel} onPress={onPrimary} />
+        {secondaryLabel && onSecondary ? (
+          <PrimaryButton
+            title={secondaryLabel}
+            onPress={onSecondary}
+            variant="secondary"
+            style={{ marginTop: spacing.sm }}
+          />
+        ) : null}
+      </View>
+    </Screen>
+  );
 }
 
 export default function SwipeScreen() {
@@ -46,13 +83,14 @@ export default function SwipeScreen() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("swiping");
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
+  const [groupProgress, setGroupProgress] = useState({ done: 0, total: 1 });
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
 
   const position = useRef(new Animated.ValueXY()).current;
   const rotation = position.x.interpolate({
     inputRange: [-width / 2, 0, width / 2],
     outputRange: ["-15deg", "0deg", "15deg"],
   });
-
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => !swiping,
@@ -74,12 +112,10 @@ export default function SwipeScreen() {
     })
   ).current;
 
-  // Reset fetch guard when session changes
   useEffect(() => {
     hasFetchedRef.current = false;
   }, [session?.id]);
 
-  // Load restaurants once when session enters swiping state
   useEffect(() => {
     if (session?.status === "swiping" && !hasFetchedRef.current) {
       hasFetchedRef.current = true;
@@ -87,7 +123,27 @@ export default function SwipeScreen() {
     }
   }, [session?.id, session?.status]);
 
-  // Poll via backend when waiting for owner to start (avoids RLS blocking direct queries)
+  useEffect(() => {
+    if (!session || session.status !== "swiping") return;
+    const sessionId = session.id;
+    async function pollGroup() {
+      try {
+        const r = await api.sessions.matches(sessionId);
+        setGroupProgress({ done: r.doneCount, total: r.participantCount || 1 });
+      } catch {}
+    }
+    pollGroup();
+    const interval = setInterval(pollGroup, 4000);
+    return () => clearInterval(interval);
+  }, [session?.id, session?.status]);
+
+  useEffect(() => {
+    api.bookmarks
+      .list()
+      .then(({ bookmarks }) => setBookmarkedIds(new Set(bookmarks.map((b) => b.id))))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!session || session.status === "swiping") return;
     const interval = setInterval(async () => {
@@ -101,7 +157,6 @@ export default function SwipeScreen() {
     return () => clearInterval(interval);
   }, [session?.id, session?.status]);
 
-  // When all cards are swiped, fetch results
   useEffect(() => {
     if (
       phase === "swiping" &&
@@ -157,12 +212,17 @@ export default function SwipeScreen() {
       setPhase(result.allDone ? "results" : "waiting");
     } catch (e) {
       console.error("Failed to load results", e);
-      setMatchResult({ matches: [], topMatch: null, participantCount: 0, doneCount: 0, allDone: false });
+      setMatchResult({
+        matches: [],
+        topMatch: null,
+        participantCount: 0,
+        doneCount: 0,
+        allDone: false,
+      });
       setPhase("results");
     }
   }
 
-  // Poll while waiting for other members to finish swiping
   useEffect(() => {
     if (phase !== "waiting" || !session) return;
     const interval = setInterval(async () => {
@@ -176,7 +236,7 @@ export default function SwipeScreen() {
   }, [phase, session?.id]);
 
   function swipeCard(direction: SwipeDirection) {
-    if (swiping) return;
+    if (swiping || !session) return;
     setSwiping(true);
     const toX = direction === "like" ? width * 1.5 : -width * 1.5;
     Animated.timing(position, {
@@ -194,84 +254,75 @@ export default function SwipeScreen() {
     });
   }
 
-  // ── Session gates ──────────────────────────────────────────────
   if (!session) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.gateEmoji}>👥</Text>
-        <Text style={styles.gateText}>You need to be in a session to start swiping.</Text>
-        <TouchableOpacity style={styles.btn} onPress={() => router.push("/(tabs)/sessions")}>
-          <Text style={styles.btnText}>Join or create a session</Text>
-        </TouchableOpacity>
-      </View>
+      <GateView
+        emoji="👥"
+        message="You need to be in a session to start swiping."
+        primaryLabel="Join or create a session"
+        onPrimary={() => router.push("/(tabs)/sessions")}
+      />
     );
   }
 
   if (session.status !== "swiping") {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.gateEmoji}>⏳</Text>
-        <Text style={styles.gateText}>Waiting for the group leader to start swiping…</Text>
-        <TouchableOpacity style={styles.btn} onPress={() => router.push("/(tabs)/sessions")}>
-          <Text style={styles.btnText}>Back to session</Text>
-        </TouchableOpacity>
-      </View>
+      <GateView
+        emoji="⏳"
+        message="Waiting for the group leader to start swiping…"
+        primaryLabel="Back to session"
+        onPrimary={() => router.push("/(tabs)/sessions")}
+      />
     );
   }
 
-  // ── Loading / error states ─────────────────────────────────────
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF4F00" />
+      <Screen style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Finding restaurants…</Text>
-      </View>
+      </Screen>
     );
   }
 
   if (fetchError) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.gateText}>{fetchError}</Text>
-        <TouchableOpacity style={styles.btn} onPress={() => fetchRestaurants()}>
-          <Text style={styles.btnText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
+      <GateView
+        emoji="⚠️"
+        message={fetchError}
+        primaryLabel="Retry"
+        onPrimary={() => fetchRestaurants()}
+      />
     );
   }
 
-  // Session was started but has no restaurants seeded yet (e.g. joined mid-session before owner loaded)
   if (!loading && phase === "swiping" && restaurants.length === 0) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.gateEmoji}>🍽️</Text>
-        <Text style={styles.gateText}>Restaurants are being loaded for this session…</Text>
-        <TouchableOpacity style={styles.btn} onPress={() => fetchRestaurants()}>
-          <Text style={styles.btnText}>Refresh</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push("/(tabs)/sessions")}>
-          <Text style={styles.secondaryBtnText}>Back to Group</Text>
-        </TouchableOpacity>
-      </View>
+      <GateView
+        emoji="🍽️"
+        message="Restaurants are being loaded for this session…"
+        primaryLabel="Refresh"
+        onPrimary={() => fetchRestaurants()}
+        secondaryLabel="Back to Group"
+        onSecondary={() => router.push("/(tabs)/sessions")}
+      />
     );
   }
 
-  // ── Results loading ────────────────────────────────────────────
   if (phase === "loading_results") {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF4F00" />
+      <Screen style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Finding your match…</Text>
-      </View>
+      </Screen>
     );
   }
 
-  // ── Waiting for others ─────────────────────────────────────────
   if (phase === "waiting" && matchResult) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Screen>
         <View style={styles.resultContainer}>
-          <ActivityIndicator size="large" color="#FF4F00" style={{ marginBottom: 24 }} />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: spacing.lg }} />
           <Text style={styles.resultTitle}>You're done!</Text>
           <Text style={styles.resultSubtitle}>Waiting for everyone to finish…</Text>
           <View style={styles.doneCard}>
@@ -281,65 +332,43 @@ export default function SwipeScreen() {
             <Text style={styles.doneLabel}>members finished</Text>
           </View>
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
-  // ── Results screen ─────────────────────────────────────────────
   if (phase === "results" && matchResult) {
     const { matches, topMatch, participantCount } = matchResult;
 
     if (matches.length > 0) {
       const pick = matches[0];
       return (
-        <SafeAreaView style={styles.container}>
+        <Screen>
           <View style={styles.resultContainer}>
             <Text style={styles.resultEmoji}>🎉</Text>
             <Text style={styles.resultTitle}>Everyone agrees!</Text>
             <Text style={styles.resultSubtitle}>Your group match</Text>
-            <View style={styles.resultCard}>
-              {pick.photo_url ? (
-                <Image source={{ uri: pick.photo_url }} style={styles.resultImage} />
-              ) : (
-                <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
-                  <Text style={{ fontSize: 48 }}>🍽️</Text>
-                </View>
-              )}
-              <Text style={styles.resultName}>{pick.name}</Text>
-              <Text style={styles.resultMeta}>
-                {pick.cuisines[0]} · {PRICE_LABELS[pick.price_level]} · ⭐ {pick.rating.toFixed(1)}
-              </Text>
-              <Text style={styles.resultAddress} numberOfLines={2}>{pick.address}</Text>
+            <View style={styles.resultCardWrap}>
+              <RestaurantCard restaurant={pick} variant="stack" />
             </View>
-            <TouchableOpacity style={styles.btn} onPress={() => router.push("/(tabs)/sessions")}>
-              <Text style={styles.btnText}>Back to Group</Text>
-            </TouchableOpacity>
+            <PrimaryButton
+              title="Back to Group"
+              onPress={() => router.push("/(tabs)/sessions")}
+            />
           </View>
-        </SafeAreaView>
+        </Screen>
       );
     }
 
     return (
-      <SafeAreaView style={styles.container}>
+      <Screen>
         <View style={styles.resultContainer}>
           <Text style={styles.resultEmoji}>🤔</Text>
           <Text style={styles.resultTitle}>No full match yet</Text>
           <Text style={styles.resultSubtitle}>Most popular across the group</Text>
 
           {topMatch ? (
-            <View style={styles.resultCard}>
-              {topMatch.photo_url ? (
-                <Image source={{ uri: topMatch.photo_url }} style={styles.resultImage} />
-              ) : (
-                <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
-                  <Text style={{ fontSize: 48 }}>🍽️</Text>
-                </View>
-              )}
-              <Text style={styles.resultName}>{topMatch.name}</Text>
-              <Text style={styles.resultMeta}>
-                {topMatch.cuisines[0]} · {PRICE_LABELS[topMatch.price_level]} · ⭐{" "}
-                {topMatch.rating.toFixed(1)}
-              </Text>
+            <View style={styles.resultCardWrap}>
+              <RestaurantCard restaurant={topMatch} variant="stack" />
               <View style={styles.likeBar}>
                 <Text style={styles.likeCount}>
                   ❤️ {topMatch.likeCount} / {participantCount} members liked this
@@ -350,39 +379,70 @@ export default function SwipeScreen() {
             <Text style={styles.noLikesText}>Nobody liked any restaurants yet.</Text>
           )}
 
-          <TouchableOpacity style={styles.btn} onPress={() => fetchRestaurants(true)}>
-            <Text style={styles.btnText}>Try another {BATCH_SIZE}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.secondaryBtn}
+          <PrimaryButton
+            title={`Try another ${BATCH_SIZE}`}
+            onPress={() => fetchRestaurants(true)}
+          />
+          <PrimaryButton
+            title="Back to Group"
             onPress={() => router.push("/(tabs)/sessions")}
-          >
-            <Text style={styles.secondaryBtnText}>Back to Group</Text>
-          </TouchableOpacity>
+            variant="secondary"
+            style={{ marginTop: spacing.sm }}
+          />
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
-  // ── Swiping ────────────────────────────────────────────────────
   const current = restaurants[currentIndex];
   const next = restaurants[currentIndex + 1];
 
   if (!current) return null;
 
-  const remaining = restaurants.length - currentIndex;
+  const cardOverlay = {
+    groupDone: groupProgress.done,
+    groupTotal: groupProgress.total,
+  };
+
+  async function toggleBookmark() {
+    const id = current.id;
+    const wasBookmarked = bookmarkedIds.has(id);
+    setBookmarkedIds((prev) => {
+      const next = new Set(prev);
+      wasBookmarked ? next.delete(id) : next.add(id);
+      return next;
+    });
+    try {
+      if (wasBookmarked) await api.bookmarks.remove(id);
+      else await api.bookmarks.add(id);
+    } catch (e: any) {
+      setBookmarkedIds((prev) => {
+        const next = new Set(prev);
+        wasBookmarked ? next.add(id) : next.delete(id);
+        return next;
+      });
+      Alert.alert(
+        "Could not save",
+        e?.message ?? "Check that you are signed in and the API is running."
+      );
+    }
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
-        <Text style={styles.header}>{session.name}</Text>
-        <Text style={styles.counter}>{remaining} left</Text>
-      </View>
+    <Screen edges={["top"]} style={styles.swipeScreen}>
+      <SwipeHeader
+        inviteCode={session.invite_code}
+        participantCount={groupProgress.total}
+      />
 
       <View style={styles.cardStack}>
         {next && (
           <View style={[styles.cardWrapper, styles.nextCard]}>
-            <RestaurantCard restaurant={next} />
+            <RestaurantCard
+              restaurant={next}
+              variant="stack"
+              overlay={cardOverlay}
+            />
           </View>
         )}
         <Animated.View
@@ -398,138 +458,136 @@ export default function SwipeScreen() {
           ]}
           {...panResponder.panHandlers}
         >
-          <RestaurantCard restaurant={current} />
+          <RestaurantCard
+            restaurant={current}
+            variant="stack"
+            overlay={cardOverlay}
+          />
         </Animated.View>
       </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.dislikeButton]}
-          onPress={() => swipeCard("dislike")}
-        >
-          <Text style={styles.actionEmoji}>✕</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.likeButton]}
-          onPress={() => swipeCard("like")}
-        >
-          <Text style={styles.actionEmoji}>♥</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      <SwipeActionBar
+        onDislike={() => swipeCard("dislike")}
+        onBookmark={toggleBookmark}
+        onLike={() => swipeCard("like")}
+        disabled={swiping}
+        bookmarked={bookmarkedIds.has(current.id)}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f8f8" },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  header: { fontSize: 22, fontWeight: "800", color: "#1a1a1a" },
-  counter: { fontSize: 14, fontWeight: "600", color: "#FF4F00" },
-  cardStack: { flex: 1, alignItems: "center", justifyContent: "center" },
-  cardWrapper: { position: "absolute" },
-  nextCard: { transform: [{ scale: 0.95 }, { translateY: 16 }] },
-  actions: {
-    flexDirection: "row",
+  gateScreen: {
     justifyContent: "center",
-    gap: 24,
-    paddingVertical: 32,
   },
-  actionButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  gateContent: {
+    padding: spacing.xl,
+    width: "100%",
+  },
+  gateEmoji: {
+    fontSize: 64,
+    textAlign: "center",
+    marginBottom: spacing.md,
+  },
+  gateText: {
+    fontSize: 17,
+    fontFamily: fontFamily.regular,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginBottom: spacing.lg,
+    lineHeight: 24,
+  },
+  centered: {
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  dislikeButton: { backgroundColor: "#fff", borderWidth: 2, borderColor: "#ff4444" },
-  likeButton: { backgroundColor: "#fff", borderWidth: 2, borderColor: "#44cc44" },
-  actionEmoji: { fontSize: 24 },
-  // ── Results ──
+  loadingText: {
+    marginTop: spacing.md,
+    color: colors.textMuted,
+    fontSize: 16,
+    fontFamily: fontFamily.regular,
+  },
+  swipeScreen: {
+    backgroundColor: colors.background,
+  },
+  cardStack: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardWrapper: {
+    position: "absolute",
+  },
+  nextCard: {
+    transform: [{ scale: 0.96 }, { translateY: 12 }],
+    opacity: 0.9,
+  },
   resultContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
+    padding: spacing.lg,
   },
-  resultEmoji: { fontSize: 64, marginBottom: 12 },
-  resultTitle: { fontSize: 28, fontWeight: "800", color: "#1a1a1a", marginBottom: 4 },
-  resultSubtitle: { fontSize: 15, color: "#999", marginBottom: 24 },
-  resultCard: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    overflow: "hidden",
+  resultEmoji: {
+    fontSize: 64,
+    marginBottom: spacing.sm,
+  },
+  resultTitle: {
+    fontSize: 28,
+    fontFamily: fontFamily.extraBold,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  resultSubtitle: {
+    fontSize: 15,
+    fontFamily: fontFamily.regular,
+    color: colors.textLight,
+    marginBottom: spacing.lg,
+  },
+  resultCardWrap: {
     width: "100%",
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  resultImage: { width: "100%", height: 180 },
-  resultImagePlaceholder: {
-    backgroundColor: "#f0f0f0",
+    marginBottom: spacing.lg,
     alignItems: "center",
-    justifyContent: "center",
   },
-  resultName: { fontSize: 22, fontWeight: "700", color: "#1a1a1a", padding: 16, paddingBottom: 4 },
-  resultMeta: { fontSize: 14, color: "#666", paddingHorizontal: 16, paddingBottom: 8, textTransform: "capitalize" },
-  resultAddress: { fontSize: 13, color: "#999", paddingHorizontal: 16, paddingBottom: 16 },
   likeBar: {
-    backgroundColor: "#fff3ee",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
+    backgroundColor: colors.tintSurface,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    marginTop: spacing.sm,
+    width: "100%",
   },
-  likeCount: { fontSize: 14, color: "#FF4F00", fontWeight: "600", textAlign: "center" },
-  noLikesText: { fontSize: 16, color: "#999", marginBottom: 24 },
+  likeCount: {
+    fontSize: 14,
+    fontFamily: fontFamily.semiBold,
+    color: colors.primary,
+    textAlign: "center",
+  },
+  noLikesText: {
+    fontSize: 16,
+    fontFamily: fontFamily.regular,
+    color: colors.textLight,
+    marginBottom: spacing.lg,
+  },
   doneCard: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 32,
+    backgroundColor: colors.surface,
+    borderRadius: spacing.cardRadius,
+    padding: spacing.xl,
     alignItems: "center",
     width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  doneCount: { fontSize: 48, fontWeight: "800", color: "#FF4F00" },
-  doneLabel: { fontSize: 16, color: "#999", marginTop: 8 },
-  // ── Gates / loading ──
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
-  gateEmoji: { fontSize: 64, marginBottom: 16 },
-  gateText: { fontSize: 18, color: "#666", textAlign: "center", marginBottom: 24 },
-  loadingText: { marginTop: 16, color: "#666", fontSize: 16 },
-  btn: {
-    backgroundColor: "#FF4F00",
-    borderRadius: 12,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    alignItems: "center",
-    width: "100%",
-    marginBottom: 12,
+  doneCount: {
+    fontSize: 48,
+    fontFamily: fontFamily.extraBold,
+    color: colors.primary,
   },
-  btnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  secondaryBtn: {
-    borderRadius: 12,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    alignItems: "center",
-    width: "100%",
+  doneLabel: {
+    fontSize: 16,
+    fontFamily: fontFamily.regular,
+    color: colors.textLight,
+    marginTop: spacing.sm,
   },
-  secondaryBtnText: { color: "#999", fontWeight: "600", fontSize: 16 },
 });

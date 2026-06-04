@@ -1,13 +1,13 @@
 import { useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useAuth } from "@/src/hooks/useAuth";
 import { api } from "@/src/lib/api";
+import { Screen } from "@/src/components/ui/Screen";
+import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
+import { colors } from "@/src/theme/colors";
+import { spacing } from "@/src/theme/spacing";
+import { fontFamily } from "@/src/theme/typography";
+import { screenStyles } from "@/src/theme/screenStyles";
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
@@ -30,8 +30,8 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Profile</Text>
+    <Screen style={styles.screen}>
+      <Text style={screenStyles.header}>Profile</Text>
 
       <View style={styles.card}>
         <View style={styles.avatar}>
@@ -42,15 +42,14 @@ export default function ProfileScreen() {
         <Text style={styles.email}>{session?.user.email}</Text>
       </View>
 
-      <TouchableOpacity
-        style={styles.resetButton}
+      <PrimaryButton
+        title={resetting ? "Resetting..." : "Reset Likes"}
         onPress={handleReset}
+        loading={resetting}
         disabled={resetting}
-      >
-        <Text style={styles.resetText}>
-          {resetting ? "Resetting..." : "Reset Likes"}
-        </Text>
-      </TouchableOpacity>
+        variant="secondary"
+        style={styles.resetButton}
+      />
 
       {resetSuccess && (
         <Text style={styles.successText}>Likes reset — go discover again!</Text>
@@ -60,63 +59,75 @@ export default function ProfileScreen() {
       <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f8f8", padding: 16 },
-  header: { fontSize: 28, fontWeight: "800", color: "#1a1a1a", marginBottom: 24 },
+  screen: {
+    flex: 1,
+    padding: spacing.md,
+  },
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 24,
+    backgroundColor: colors.surface,
+    borderRadius: spacing.cardRadius,
+    padding: spacing.lg,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#C94000",
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    marginBottom: spacing.md,
+    borderWidth: 3,
+    borderColor: colors.tintSurface,
   },
-  avatarText: { fontSize: 32, fontWeight: "800", color: "#fff" },
-  email: { fontSize: 16, color: "#666" },
+  avatarText: {
+    fontSize: 36,
+    fontFamily: fontFamily.extraBold,
+    color: "#fff",
+  },
+  email: {
+    fontSize: 16,
+    fontFamily: fontFamily.regular,
+    color: colors.textMuted,
+  },
   resetButton: {
-    marginTop: 16,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#C94000",
+    marginTop: spacing.sm,
   },
-  resetText: { color: "#C94000", fontWeight: "700", fontSize: 16 },
   successText: {
-    marginTop: 12,
+    marginTop: spacing.md,
     textAlign: "center",
-    color: "#44aa44",
+    color: colors.like,
     fontSize: 14,
+    fontFamily: fontFamily.semiBold,
   },
   errorText: {
-    marginTop: 12,
+    marginTop: spacing.md,
     textAlign: "center",
-    color: "#ff4444",
+    color: colors.destructive,
     fontSize: 14,
+    fontFamily: fontFamily.regular,
   },
   signOutButton: {
-    position: "absolute",
-    bottom: 48,
-    left: 16,
-    right: 16,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
+    marginTop: spacing.xl,
+    marginBottom: spacing.xl,
+    backgroundColor: colors.surface,
+    borderRadius: 28,
+    padding: spacing.md,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ff4444",
+    borderWidth: 1.5,
+    borderColor: colors.destructive,
   },
-  signOutText: { color: "#ff4444", fontWeight: "700", fontSize: 16 },
+  signOutText: {
+    color: colors.destructive,
+    fontFamily: fontFamily.bold,
+    fontSize: 16,
+  },
 });

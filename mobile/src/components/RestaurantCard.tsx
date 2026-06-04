@@ -5,126 +5,238 @@ import {
   StyleSheet,
   Dimensions,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Restaurant } from "@/src/lib/api";
+import { colors } from "@/src/theme/colors";
+import { spacing } from "@/src/theme/spacing";
+import { fontFamily } from "@/src/theme/typography";
+import {
+  formatCategoryLabel,
+  formatWalkLocationLine,
+  formatGroupHungryLabel,
+} from "@/src/lib/restaurantFormat";
 
-const { width } = Dimensions.get("window");
-const CARD_WIDTH = width - 32;
+const { width, height } = Dimensions.get("window");
+const CARD_WIDTH = width - spacing.cardHorizontalMargin * 2;
+const STACK_CARD_HEIGHT = height * 0.58;
 
-const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
+interface StackOverlay {
+  groupDone?: number;
+  groupTotal?: number;
+}
 
 interface Props {
   restaurant: Restaurant;
+  variant?: "stack" | "compact";
+  overlay?: StackOverlay;
 }
 
-export function RestaurantCard({ restaurant }: Props) {
+export function RestaurantCard({ restaurant, variant = "stack", overlay }: Props) {
+  if (variant === "compact") {
+    return <CompactCard restaurant={restaurant} />;
+  }
+
+  const categoryLabel = formatCategoryLabel(
+    restaurant.price_level,
+    restaurant.cuisines
+  );
+  const locationLine = formatWalkLocationLine(
+    restaurant.distance_meters,
+    restaurant.address
+  );
+  const groupLabel =
+    overlay?.groupTotal != null && overlay.groupDone != null
+      ? formatGroupHungryLabel(overlay.groupDone, overlay.groupTotal)
+      : null;
+
   return (
-    <View style={styles.card}>
+    <View style={styles.stackCard}>
       {restaurant.photo_url ? (
         <Image
           source={{ uri: restaurant.photo_url }}
-          style={styles.image}
+          style={styles.stackImage}
           resizeMode="cover"
         />
       ) : (
-        <View style={[styles.image, styles.imagePlaceholder]}>
+        <View style={[styles.stackImage, styles.imagePlaceholder]}>
           <Text style={styles.placeholderEmoji}>🍽️</Text>
         </View>
       )}
 
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>
+      {groupLabel ? (
+        <View style={[styles.pill, styles.pillTopLeft]}>
+          <View style={styles.pillAvatars}>
+            <View style={[styles.miniAvatar, { backgroundColor: colors.avatar[0] }]} />
+            <View style={[styles.miniAvatar, { backgroundColor: colors.avatar[1], marginLeft: -6 }]} />
+          </View>
+          <Text style={styles.pillText}>{groupLabel}</Text>
+        </View>
+      ) : null}
+
+      <View style={[styles.pill, styles.pillTopRight]}>
+        <Text style={styles.pillText}>{categoryLabel}</Text>
+      </View>
+
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.15)", "rgba(0,0,0,0.82)"]}
+        locations={[0, 0.45, 1]}
+        style={styles.gradient}
+      >
+        {locationLine ? (
+          <Text style={styles.locationLine} numberOfLines={1}>
+            {locationLine}
+          </Text>
+        ) : null}
+        <Text style={styles.stackName} numberOfLines={2}>
           {restaurant.name}
         </Text>
-        <View style={styles.meta}>
-          <Text style={styles.cuisine}>
-            {restaurant.cuisines.join(", ")}
-          </Text>
-          <Text style={styles.dot}>·</Text>
-          <Text style={styles.price}>
-            {PRICE_LABELS[restaurant.price_level] ?? ""}
-          </Text>
-          <Text style={styles.dot}>·</Text>
-          <Text style={styles.rating}>⭐ {restaurant.rating.toFixed(1)}</Text>
+      </LinearGradient>
+    </View>
+  );
+}
+
+function CompactCard({ restaurant }: { restaurant: Restaurant }) {
+  const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
+  return (
+    <View style={styles.compactCard}>
+      {restaurant.photo_url ? (
+        <Image
+          source={{ uri: restaurant.photo_url }}
+          style={styles.compactImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[styles.compactImage, styles.imagePlaceholder]}>
+          <Text style={styles.compactPlaceholderEmoji}>🍽️</Text>
         </View>
-        <Text style={styles.address} numberOfLines={1}>
-          {restaurant.address}
+      )}
+      <View style={styles.compactInfo}>
+        <Text style={styles.compactName} numberOfLines={1}>
+          {restaurant.name}
         </Text>
-        {restaurant.distance_meters && (
-          <Text style={styles.distance}>
-            {restaurant.distance_meters < 1000
-              ? `${Math.round(restaurant.distance_meters)}m away`
-              : `${(restaurant.distance_meters / 1000).toFixed(1)}km away`}
-          </Text>
-        )}
+        <Text style={styles.compactMeta} numberOfLines={1}>
+          {restaurant.cuisines[0]} · {PRICE_LABELS[restaurant.price_level]} · ⭐{" "}
+          {restaurant.rating.toFixed(1)}
+        </Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  stackCard: {
     width: CARD_WIDTH,
-    backgroundColor: "#fff",
-    borderRadius: 20,
+    height: STACK_CARD_HEIGHT,
+    borderRadius: spacing.cardRadius,
     overflow: "hidden",
+    backgroundColor: colors.imagePlaceholder,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  image: {
+  stackImage: {
+    ...StyleSheet.absoluteFillObject,
     width: "100%",
-    height: 320,
+    height: "100%",
   },
   imagePlaceholder: {
-    backgroundColor: "#f0f0f0",
     alignItems: "center",
     justifyContent: "center",
   },
   placeholderEmoji: {
     fontSize: 64,
   },
-  info: {
-    padding: 20,
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1a1a1a",
-    marginBottom: 6,
-  },
-  meta: {
+  pill: {
+    position: "absolute",
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    backgroundColor: colors.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 2,
+    gap: 6,
   },
-  cuisine: {
-    fontSize: 14,
-    color: "#666",
-    textTransform: "capitalize",
+  pillTopLeft: {
+    top: 16,
+    left: 16,
   },
-  dot: {
-    fontSize: 14,
-    color: "#ccc",
-    marginHorizontal: 6,
+  pillTopRight: {
+    top: 16,
+    right: 16,
   },
-  price: {
-    fontSize: 14,
-    color: "#666",
+  pillAvatars: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  rating: {
-    fontSize: 14,
-    color: "#666",
+  miniAvatar: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: "#fff",
   },
-  address: {
-    fontSize: 13,
-    color: "#999",
+  pillText: {
+    fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+    color: colors.text,
+  },
+  gradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.md,
+    paddingTop: 56,
+    paddingBottom: spacing.lg,
+  },
+  locationLine: {
+    fontSize: 11,
+    fontFamily: fontFamily.semiBold,
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 1.2,
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+  stackName: {
+    fontSize: 26,
+    fontFamily: fontFamily.extraBold,
+    color: "#fff",
+    lineHeight: 32,
+  },
+  compactCard: {
+    flexDirection: "row",
+    backgroundColor: colors.surface,
+    borderRadius: spacing.cardRadius,
+    overflow: "hidden",
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  compactImage: {
+    width: 88,
+    height: 88,
+  },
+  compactPlaceholderEmoji: {
+    fontSize: 32,
+  },
+  compactInfo: {
+    flex: 1,
+    padding: spacing.md,
+    justifyContent: "center",
+  },
+  compactName: {
+    fontSize: 16,
+    fontFamily: fontFamily.bold,
+    color: colors.text,
     marginBottom: 4,
   },
-  distance: {
+  compactMeta: {
     fontSize: 13,
-    color: "#FF4F00",
-    fontWeight: "600",
+    fontFamily: fontFamily.regular,
+    color: colors.textMuted,
+    textTransform: "capitalize",
   },
 });

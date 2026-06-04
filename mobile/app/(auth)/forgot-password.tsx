@@ -1,15 +1,11 @@
 import { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { Text, TextInput, TouchableOpacity, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/src/hooks/useAuth";
+import { AuthLayout, authInputStyle, PrimaryButton } from "@/src/components/ui";
+import { colors } from "@/src/theme/colors";
+import { fontFamily } from "@/src/theme/typography";
+import { spacing } from "@/src/theme/spacing";
 
 export default function ForgotPasswordScreen() {
   const { resetPassword } = useAuth();
@@ -34,107 +30,54 @@ export default function ForgotPasswordScreen() {
 
   if (sent) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.emoji}>📨</Text>
-        <Text style={styles.title}>Email sent</Text>
-        <Text style={styles.body}>
-          Check your inbox for a password reset link.
-        </Text>
-        <TouchableOpacity
-          style={styles.button}
+      <AuthLayout showLogo={false} title="Email sent" subtitle="Check your inbox for a password reset link.">
+        <PrimaryButton
+          title="Back to Sign In"
           onPress={() => router.replace("/(auth)/login")}
-        >
-          <Text style={styles.buttonText}>Back to Sign In</Text>
-        </TouchableOpacity>
-      </View>
+        />
+      </AuthLayout>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <View style={styles.wrapper}>
       <TouchableOpacity style={styles.back} onPress={() => router.back()}>
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
-
-      <Text style={styles.emoji}>🔑</Text>
-      <Text style={styles.title}>Reset password</Text>
-      <Text style={styles.body}>
-        Enter your email and we'll send you a link to reset your password.
-      </Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor="#999"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      {error && <Text style={styles.error}>{error}</Text>}
-
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleReset}
-        disabled={loading}
+      <AuthLayout
+        showLogo={false}
+        title="Reset password"
+        subtitle="Enter your email and we'll send you a link to reset your password."
       >
-        <Text style={styles.buttonText}>
-          {loading ? "Sending..." : "Send Reset Link"}
-        </Text>
-      </TouchableOpacity>
-    </KeyboardAvoidingView>
+        <TextInput
+          style={authInputStyle.input}
+          placeholder="Email"
+          placeholderTextColor={colors.textLight}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+        />
+
+        {error && <Text style={authInputStyle.error}>{error}</Text>}
+
+        <PrimaryButton
+          title={loading ? "Sending..." : "Send Reset Link"}
+          onPress={handleReset}
+          loading={loading}
+          disabled={loading}
+        />
+      </AuthLayout>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#C94000",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 32,
-  },
-  back: { position: "absolute", top: 64, left: 32 },
-  backText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  emoji: { fontSize: 56, marginBottom: 16 },
-  title: { fontSize: 28, fontWeight: "800", color: "#fff", marginBottom: 12 },
-  body: {
-    fontSize: 15,
-    color: "rgba(255,255,255,0.85)",
-    textAlign: "center",
-    marginBottom: 32,
-    lineHeight: 22,
-  },
-  input: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
+  wrapper: { flex: 1, backgroundColor: colors.background },
+  back: { position: "absolute", top: 56, left: spacing.xl, zIndex: 10 },
+  backText: {
+    color: colors.primary,
     fontSize: 16,
-    marginBottom: 12,
-    color: "#1a1a1a",
-  },
-  button: {
-    width: "100%",
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  error: {
-    width: "100%",
-    color: "#fff",
-    backgroundColor: "rgba(0,0,0,0.25)",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    fontSize: 14,
+    fontFamily: fontFamily.semiBold,
   },
 });

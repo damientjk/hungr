@@ -1,15 +1,11 @@
 import { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import { Link } from "expo-router";
 import { useAuth } from "@/src/hooks/useAuth";
+import { AuthLayout, authInputStyle, PrimaryButton } from "@/src/components/ui";
+import { colors } from "@/src/theme/colors";
+import { fontFamily } from "@/src/theme/typography";
+import { spacing } from "@/src/theme/spacing";
 
 export default function LoginScreen() {
   const { signInWithEmail } = useAuth();
@@ -27,42 +23,33 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <Text style={styles.logo}>🍔 Hungr</Text>
-      <Text style={styles.tagline}>Swipe right on dinner.</Text>
-
+    <AuthLayout subtitle="Swipe right on dinner.">
       <TextInput
-        style={styles.input}
+        style={authInputStyle.input}
         placeholder="Email"
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textLight}
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
       />
       <TextInput
-        style={styles.input}
+        style={authInputStyle.input}
         placeholder="Password"
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textLight}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
       />
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && <Text style={authInputStyle.error}>{error}</Text>}
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
+      <PrimaryButton
+        title={loading ? "Signing in..." : "Sign In"}
         onPress={handleLogin}
+        loading={loading}
         disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? "Signing in..." : "Sign In"}
-        </Text>
-      </TouchableOpacity>
+      />
 
       <Link href="/(auth)/forgot-password" asChild>
         <TouchableOpacity style={styles.forgotButton}>
@@ -77,78 +64,31 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
       </Link>
-    </KeyboardAvoidingView>
+    </AuthLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#C94000",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 32,
-  },
-  logo: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  tagline: {
-    fontSize: 18,
-    color: "#fff",
-    fontWeight: "600",
-    marginBottom: 48,
-  },
-  input: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    marginBottom: 12,
-    color: "#1a1a1a",
-  },
-  button: {
-    width: "100%",
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  linkButton: {
-    marginTop: 24,
-  },
-  linkText: {
-    color: "#fff",
-    fontSize: 14,
-  },
-  linkBold: {
-    fontWeight: "700",
-  },
   forgotButton: {
-    marginTop: 16,
+    marginTop: spacing.md,
     alignSelf: "flex-end",
   },
   forgotText: {
-    color: "rgba(255,255,255,0.8)",
+    color: colors.primary,
     fontSize: 14,
+    fontFamily: fontFamily.semiBold,
   },
-  error: {
-    width: "100%",
-    color: "#fff",
-    backgroundColor: "rgba(0,0,0,0.25)",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+  linkButton: {
+    marginTop: spacing.lg,
+    alignItems: "center",
+  },
+  linkText: {
+    color: colors.textMuted,
     fontSize: 14,
+    fontFamily: fontFamily.regular,
+  },
+  linkBold: {
+    fontFamily: fontFamily.bold,
+    color: colors.primary,
   },
 });

@@ -15,7 +15,8 @@ export async function getBookmarks(req: AuthRequest, res: Response) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    res.status(500).json({ error: "Failed to fetch bookmarks" });
+    console.error("getBookmarks error:", error);
+    res.status(500).json({ error: error.message ?? "Failed to fetch bookmarks" });
     return;
   }
 
@@ -29,13 +30,17 @@ export async function addBookmark(req: AuthRequest, res: Response) {
     return;
   }
 
-  const { error } = await supabase.from("bookmarks").upsert({
-    user_id: req.userId,
-    restaurant_id: parsed.data.restaurantId,
-  });
+  const { error } = await supabase.from("bookmarks").upsert(
+    {
+      user_id: req.userId,
+      restaurant_id: parsed.data.restaurantId,
+    },
+    { onConflict: "user_id,restaurant_id" }
+  );
 
   if (error) {
-    res.status(500).json({ error: "Failed to add bookmark" });
+    console.error("addBookmark error:", error);
+    res.status(500).json({ error: error.message ?? "Failed to add bookmark" });
     return;
   }
 

@@ -17,22 +17,35 @@ app.use(
     contentSecurityPolicy: false,
   })
 );
-app.use(cors({ origin: true }));
-app.use(express.json());
 app.use(
-  rateLimit({
-    windowMs: 60 * 1000,
-    max: 200,
-    standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req) => {
-      // Rate limit per user (via auth header) rather than per IP,
-      // so multiple users sharing a Codespaces IP don't block each other.
-      const auth = req.headers.authorization;
-      return auth ?? req.ip ?? "unknown";
-    },
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+app.options("*", cors());
+app.use(express.json());
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const auth = req.headers.authorization;
+    return auth ?? req.ip ?? "unknown";
+  },
+});
+
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    next();
+    return;
+  }
+  limiter(req, res, next);
+});
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "hungr-backend" });

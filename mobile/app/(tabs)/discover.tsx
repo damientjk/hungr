@@ -1,19 +1,16 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
   FlatList,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { api, Restaurant } from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
-
-const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
+import { Screen } from "@/src/components/ui/Screen";
+import { RestaurantListRow } from "@/src/components/RestaurantListRow";
+import { colors } from "@/src/theme/colors";
+import { screenStyles } from "@/src/theme/screenStyles";
 
 export default function DiscoverScreen() {
   const { coords, loading: locationLoading, error: locationError } = useLocation();
@@ -71,8 +68,7 @@ export default function DiscoverScreen() {
       } else {
         await api.bookmarks.add(restaurantId);
       }
-    } catch (e) {
-      // Revert on failure
+    } catch {
       setBookmarked((prev) => {
         const next = new Set(prev);
         isBookmarked ? next.add(restaurantId) : next.delete(restaurantId);
@@ -89,17 +85,17 @@ export default function DiscoverScreen() {
 
   if (locationError) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyText}>{locationError}</Text>
+      <View style={screenStyles.centered}>
+        <Text style={screenStyles.emptyText}>{locationError}</Text>
       </View>
     );
   }
 
   if (locationLoading || loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF4F00" />
-        <Text style={styles.loadingText}>
+      <View style={screenStyles.centered}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={screenStyles.loadingText}>
           {locationLoading ? "Getting your location…" : "Finding restaurants…"}
         </Text>
       </View>
@@ -107,107 +103,37 @@ export default function DiscoverScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Discover</Text>
+    <Screen>
+      <Text style={screenStyles.header}>Discover</Text>
       <FlatList
         data={restaurants}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={screenStyles.list}
         renderItem={({ item }) => {
           const isBookmarked = bookmarked.has(item.id);
           const distance =
             item.distance_meters < 1000
-              ? `${Math.round(item.distance_meters)}m`
-              : `${(item.distance_meters / 1000).toFixed(1)}km`;
+              ? `${Math.round(item.distance_meters)}m away`
+              : `${(item.distance_meters / 1000).toFixed(1)}km away`;
 
           return (
-            <View style={styles.item}>
-              {item.photo_url ? (
-                <Image source={{ uri: item.photo_url }} style={styles.thumbnail} />
-              ) : (
-                <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-                  <Text style={{ fontSize: 28 }}>🍽️</Text>
-                </View>
-              )}
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={styles.itemMeta} numberOfLines={1}>
-                  {item.cuisines[0]} · {PRICE_LABELS[item.price_level]} · ⭐{" "}
-                  {item.rating.toFixed(1)}
-                </Text>
-                <Text style={styles.itemDistance}>{distance} away</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.bookmarkBtn}
-                onPress={() => toggleBookmark(item.id)}
-              >
-                <Ionicons
-                  name={isBookmarked ? "bookmark" : "bookmark-outline"}
-                  size={24}
-                  color={isBookmarked ? "#FF4F00" : "#ccc"}
-                />
-              </TouchableOpacity>
-            </View>
+            <RestaurantListRow
+              restaurant={item}
+              subtitle={distance}
+              rightAction={{
+                icon: isBookmarked ? "bookmark" : "bookmark-outline",
+                filled: isBookmarked,
+                onPress: () => toggleBookmark(item.id),
+              }}
+            />
           );
         }}
         ListEmptyComponent={
-          <View style={styles.centered}>
-            <Text style={styles.emptyText}>No restaurants found nearby.</Text>
+          <View style={screenStyles.centered}>
+            <Text style={screenStyles.emptyText}>No restaurants found nearby.</Text>
           </View>
         }
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f8f8" },
-  header: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#1a1a1a",
-    padding: 16,
-    paddingBottom: 8,
-  },
-  list: { paddingHorizontal: 16, paddingBottom: 32 },
-  item: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  thumbnail: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
-    marginRight: 12,
-  },
-  thumbnailPlaceholder: {
-    backgroundColor: "#f0f0f0",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  itemInfo: { flex: 1 },
-  itemName: { fontSize: 16, fontWeight: "700", color: "#1a1a1a", marginBottom: 4 },
-  itemMeta: { fontSize: 13, color: "#666", marginBottom: 4, textTransform: "capitalize" },
-  itemDistance: { fontSize: 13, color: "#FF4F00", fontWeight: "600" },
-  bookmarkBtn: { padding: 8 },
-  centered: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 32,
-    minHeight: 200,
-  },
-  loadingText: { marginTop: 16, color: "#666", fontSize: 16 },
-  emptyText: { fontSize: 16, color: "#999", textAlign: "center" },
-});
