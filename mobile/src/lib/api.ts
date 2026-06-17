@@ -1,16 +1,36 @@
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 import { supabase } from "./supabase";
 
+/** Port the backend listens on. */
+const BACKEND_PORT = 3000;
+
 /**
- * Web: use same-origin `/api` — Metro proxies to EXPO_PUBLIC_API_URL (see metro.config.js).
- * Native: call the backend URL directly.
+ * Resolve the backend base URL.
+ *
+ * - Web: same-origin "" — Metro proxies `/api` to the backend (see metro.config.js).
+ * - Native dev (Expo Go): derive the host from the Metro dev-server URI, so the
+ *   backend is reached at the SAME IP the app was loaded from. This means the IP
+ *   never has to be hard-coded or updated when the network (Wi-Fi/hotspot) changes.
+ * - Fallbacks: an explicit EXPO_PUBLIC_API_URL (e.g. a deployed backend), then localhost.
  */
-const API_URL =
-  Platform.OS === "web"
-    ? ""
-    : (
-        process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000"
-      ).replace(/\/$/, "");
+function resolveApiUrl(): string {
+  if (Platform.OS === "web") return "";
+
+  // e.g. "172.20.10.5:8081" — the address this app's bundle was served from.
+  const hostUri =
+    (Constants.expoConfig as any)?.hostUri ??
+    (Constants as any).expoGoConfig?.debuggerHost ??
+    "";
+  const host = String(hostUri).split(":")[0];
+  if (host) return `http://${host}:${BACKEND_PORT}`;
+
+  const explicit = process.env.EXPO_PUBLIC_API_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+  return `http://localhost:${BACKEND_PORT}`;
+}
+
+const API_URL = resolveApiUrl();
 
 async function getAuthHeader(): Promise<string> {
   const { data } = await supabase.auth.getSession();
@@ -101,10 +121,10 @@ export const api = {
       request<{ session: Session }>(`/api/sessions/join/${code}`, {
         method: "POST",
       }),
-    start: (id: string, location: { latitude: number; longitude: number }) =>
+    start: (id: string, payload: StartSwipingPayload) =>
       request<{ session: Session }>(`/api/sessions/${id}/start`, {
         method: "PATCH",
-        body: JSON.stringify(location),
+        body: JSON.stringify(payload),
       }),
     restaurants: (id: string) =>
       request<{ restaurants: Restaurant[] }>(`/api/sessions/${id}/restaurants`),
@@ -158,5 +178,52 @@ export interface Session {
   status: "active" | "swiping" | "closed";
   cuisine_filters: string[];
   max_distance: number;
+  price_min: number;
+  price_max: number;
+  halal: boolean;
+  vegetarian: boolean;
   created_at: string;
 }
+
+/** Filters the owner configures before starting a session. */
+export interface SessionFilterValues {
+  cuisineFilters: string[];
+  priceMin: number;
+  priceMax: number;
+  halal: boolean;
+  vegetarian: boolean;
+  maxDistance: number;
+  /** Optional free-text location; falls back to the device location when empty. */
+  address?: string;
+}
+
+export interface StartSwipingPayload extends SessionFilterValues {
+  latitude: number;
+  longitude: number;
+}
+
+/** Cuisine options offered as checkboxes in the session filter panel. */
+export const CUISINE_OPTIONS = [
+  "Japanese",
+  "Chinese",
+  "Korean",
+  "Italian",
+  "Indian",
+  "Thai",
+  "Western",
+  "Mexican",
+  "Fast food",
+  "Cafe",
+  "Dessert",
+  "Seafood",
+] as const;
+
+/** Sensible defaults for a fresh filter panel. */
+export const DEFAULT_FILTERS: SessionFilterValues = {
+  cuisineFilters: [],
+  priceMin: 1,
+  priceMax: 4,
+  halal: false,
+  vegetarian: false,
+  maxDistance: 5000,
+};

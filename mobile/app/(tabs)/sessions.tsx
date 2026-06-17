@@ -7,12 +7,14 @@ import {
   StyleSheet,
   Share,
   FlatList,
+  ScrollView,
   ActivityIndicator,
   Alert,
   Linking,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { api, Restaurant } from "@/src/lib/api";
+import { api, Restaurant, SessionFilterValues, DEFAULT_FILTERS } from "@/src/lib/api";
+import { SessionFilters } from "@/src/components/SessionFilters";
 import { useSession } from "@/src/lib/SessionContext";
 import { useLocation } from "@/src/hooks/useLocation";
 import { supabase } from "@/src/lib/supabase";
@@ -33,6 +35,7 @@ export default function SessionsScreen() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<SessionFilterValues>(DEFAULT_FILTERS);
   const [matchResult, setMatchResult] = useState<{
     matches: Restaurant[];
     topMatch: (Restaurant & { likeCount: number }) | null;
@@ -172,6 +175,8 @@ export default function SessionsScreen() {
       const { session: updated } = await api.sessions.start(session.id, {
         latitude: coords.latitude,
         longitude: coords.longitude,
+        ...filters,
+        address: filters.address?.trim() ? filters.address.trim() : undefined,
       });
       setSession(updated);
       router.push("/(tabs)/swipe");
@@ -195,6 +200,10 @@ export default function SessionsScreen() {
 
     return (
       <Screen style={styles.container}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.activeScroll}
+        >
         <Text style={styles.header}>Group Session</Text>
 
         <View style={styles.activeSession}>
@@ -217,9 +226,10 @@ export default function SessionsScreen() {
           )}
         </View>
 
-        {/* Action buttons */}
+        {/* Owner filters + start */}
         {isOwner && !isSwiping && (
           <>
+            <SessionFilters value={filters} onChange={setFilters} />
             {startError && <Text style={styles.error}>{startError}</Text>}
             <TouchableOpacity
               style={[styles.startButton, loading && styles.buttonDisabled]}
@@ -317,6 +327,7 @@ export default function SessionsScreen() {
         >
           <Text style={styles.leaveText}>Leave session</Text>
         </TouchableOpacity>
+        </ScrollView>
       </Screen>
     );
   }
@@ -505,12 +516,14 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: 14,
   },
+  activeScroll: {
+    paddingBottom: spacing.lg,
+  },
   matchesSection: {
     backgroundColor: colors.surface,
     borderRadius: spacing.cardRadius,
     padding: 20,
     marginBottom: spacing.md,
-    flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
   },

@@ -2,13 +2,44 @@ import { Response } from "express";
 import { z } from "zod";
 import { supabase } from "../lib/supabase";
 import { AuthRequest } from "../middleware/auth";
-import { fetchAllNearbyRestaurants } from "../lib/places";
+import { fetchAllNearbyRestaurants, SearchTag } from "../lib/places";
+import { geocodeAddress } from "../lib/geocode";
 
 const CreateSessionSchema = z.object({
   name: z.string().min(1).max(100),
   cuisineFilters: z.array(z.string()).default([]),
   maxDistance: z.number().min(100).max(50000).default(5000),
 });
+
+// ── Filters ───────────────────────────────────────────────────────────────
+interface SessionFilters {
+  cuisineFilters: string[];
+  priceMin: number;
+  priceMax: number;
+  halal: boolean;
+  vegetarian: boolean;
+}
+
+/** Normalise cuisine labels: lowercase, trimmed, de-duplicated, non-empty. */
+function normaliseCuisines(cuisines: string[]): string[] {
+  return [...new Set(cuisines.map((c) => c.trim().toLowerCase()).filter(Boolean))];
+}
+
+/** Cuisine labels plus any dietary flags, used for DB-side filtering. */
+function effectiveCuisineFilters(f: SessionFilters): string[] {
+  const arr = [...f.cuisineFilters];
+  if (f.halal) arr.push("halal");
+  if (f.vegetarian) arr.push("vegetarian");
+  return arr;
+}
+
+/** Keyword searches to run against Places to populate tagged restaurants. */
+function buildSearchTags(f: SessionFilters): SearchTag[] {
+  const tags: SearchTag[] = f.cuisineFilters.map((c) => ({ keyword: c, label: c }));
+  if (f.halal) tags.push({ keyword: "halal", label: "halal" });
+  if (f.vegetarian) tags.push({ keyword: "vegetarian", label: "vegetarian" });
+  return tags;
+}
 
 export async function getSession(req: AuthRequest, res: Response) {
   const { id } = req.params;
@@ -101,9 +132,18 @@ export async function joinSession(req: AuthRequest, res: Response) {
   res.json({ session });
 }
 
-const LocationSchema = z.object({
+// Owner-configurable filters accepted when starting a session.
+const StartSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
+  // Optional free-text location to centre the search on instead of the device.
+  address: z.string().trim().min(1).max(200).optional(),
+  cuisineFilters: z.array(z.string()).max(40).default([]),
+  priceMin: z.coerce.number().int().min(1).max(4).default(1),
+  priceMax: z.coerce.number().int().min(1).max(4).default(4),
+  halal: z.boolean().default(false),
+  vegetarian: z.boolean().default(false),
+  maxDistance: z.coerce.number().min(100).max(50000).default(5000),
 });
 
 // Fetch nearby restaurants into DB if needed, then store top N in session_restaurants
@@ -111,22 +151,29 @@ async function seedSessionRestaurants(
   sessionId: string,
   latitude: number,
   longitude: number,
-  radius: number
+  radius: number,
+  filters: SessionFilters
 ) {
   // Use a non-existent user ID so no per-user swipes are excluded
   const NOBODY = "00000000-0000-0000-0000-000000000000";
 
-  const { data: existing } = await supabase.rpc("restaurants_near_point", {
+  const cuisineArr = effectiveCuisineFilters(filters);
+  const rpcArgs = {
     lat: latitude,
     lng: longitude,
     radius_meters: radius,
     exclude_user_id: NOBODY,
-    cuisine_filter: null,
-  });
+    cuisine_filters: cuisineArr.length > 0 ? cuisineArr : null,
+    price_min: filters.priceMin,
+    price_max: filters.priceMax,
+  };
+
+  const { data: existing } = await supabase.rpc("restaurants_near_point", rpcArgs);
 
   if ((existing?.length ?? 0) < 20) {
     try {
-      const places = await fetchAllNearbyRestaurants(latitude, longitude, radius);
+      const tags = buildSearchTags(filters);
+      const places = await fetchAllNearbyRestaurants(latitude, longitude, radius, tags);
       if (places.length > 0) {
         await supabase
           .from("restaurants")
@@ -137,19 +184,14 @@ async function seedSessionRestaurants(
     }
   }
 
-  const { data: nearby } = await supabase.rpc("restaurants_near_point", {
-    lat: latitude,
-    lng: longitude,
-    radius_meters: radius,
-    exclude_user_id: NOBODY,
-    cuisine_filter: null,
-  });
+  const { data: nearby } = await supabase.rpc("restaurants_near_point", rpcArgs);
 
   const batch = (nearby ?? []).slice(0, 20);
-  if (batch.length === 0) return batch;
 
   // Replace the current batch
   await supabase.from("session_restaurants").delete().eq("session_id", sessionId);
+  if (batch.length === 0) return batch;
+
   const { error: insertError } = await supabase.from("session_restaurants").insert(
     batch.map((r: any, i: number) => ({
       session_id: sessionId,
@@ -166,16 +208,16 @@ async function seedSessionRestaurants(
 export async function startSwiping(req: AuthRequest, res: Response) {
   const { id } = req.params;
 
-  const parsed = LocationSchema.safeParse(req.body);
+  const parsed = StartSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "latitude and longitude are required" });
     return;
   }
-  const { latitude, longitude } = parsed.data;
+  const input = parsed.data;
 
   const { data: session, error: fetchError } = await supabase
     .from("sessions")
-    .select("owner_id, status, max_distance")
+    .select("owner_id, status")
     .eq("id", id)
     .single();
 
@@ -194,11 +236,61 @@ export async function startSwiping(req: AuthRequest, res: Response) {
     return;
   }
 
+  // Resolve the search centre: a custom address (looked up via Places, biased
+  // toward the device location) or the device location itself.
+  let { latitude, longitude } = input;
+  if (input.address) {
+    const geo = await geocodeAddress(input.address, {
+      latitude: input.latitude,
+      longitude: input.longitude,
+    });
+    if (!geo) {
+      res.status(400).json({
+        error: `Couldn't find "${input.address}". Try a more specific place or address.`,
+      });
+      return;
+    }
+    latitude = geo.latitude;
+    longitude = geo.longitude;
+  }
+
+  // Clamp price range and normalise cuisines.
+  const priceMin = Math.min(input.priceMin, input.priceMax);
+  const priceMax = Math.max(input.priceMin, input.priceMax);
+  const filters: SessionFilters = {
+    cuisineFilters: normaliseCuisines(input.cuisineFilters),
+    priceMin,
+    priceMax,
+    halal: input.halal,
+    vegetarian: input.vegetarian,
+  };
+
+  // Persist the chosen filters so member re-fetches use the same criteria.
+  await supabase
+    .from("sessions")
+    .update({
+      cuisine_filters: filters.cuisineFilters,
+      price_min: filters.priceMin,
+      price_max: filters.priceMax,
+      halal: filters.halal,
+      vegetarian: filters.vegetarian,
+      max_distance: input.maxDistance,
+    })
+    .eq("id", id);
+
+  let batch;
   try {
-    await seedSessionRestaurants(id, latitude, longitude, session.max_distance ?? 5000);
+    batch = await seedSessionRestaurants(id, latitude, longitude, input.maxDistance, filters);
   } catch (e: any) {
     console.error("seedSessionRestaurants failed:", e);
     res.status(500).json({ error: e.message ?? "Failed to load restaurants for session" });
+    return;
+  }
+
+  if (!batch || batch.length === 0) {
+    res.status(400).json({
+      error: "No restaurants match these filters. Try widening the distance, price, or cuisine.",
+    });
     return;
   }
 
@@ -262,7 +354,12 @@ export async function getSessionRestaurants(req: AuthRequest, res: Response) {
 export async function refreshSessionRestaurants(req: AuthRequest, res: Response) {
   const { id } = req.params;
 
-  const parsed = LocationSchema.safeParse(req.body);
+  const parsed = z
+    .object({
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+    })
+    .safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "latitude and longitude are required" });
     return;
@@ -282,13 +379,22 @@ export async function refreshSessionRestaurants(req: AuthRequest, res: Response)
     return;
   }
 
+  // Re-seed using the filters the owner configured for this session.
   const { data: session } = await supabase
     .from("sessions")
-    .select("max_distance")
+    .select("cuisine_filters, max_distance, price_min, price_max, halal, vegetarian")
     .eq("id", id)
     .single();
 
-  await seedSessionRestaurants(id, latitude, longitude, session?.max_distance ?? 5000);
+  const filters: SessionFilters = {
+    cuisineFilters: session?.cuisine_filters ?? [],
+    priceMin: session?.price_min ?? 1,
+    priceMax: session?.price_max ?? 4,
+    halal: session?.halal ?? false,
+    vegetarian: session?.vegetarian ?? false,
+  };
+
+  await seedSessionRestaurants(id, latitude, longitude, session?.max_distance ?? 5000, filters);
 
   // Re-use the same two-query approach as getSessionRestaurants
   const { data: rows } = await supabase

@@ -27,7 +27,7 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
     lng: longitude,
     radius_meters: radius,
     exclude_user_id: req.userId,
-    cuisine_filter: null,
+    cuisine_filters: null,
   });
   const nearbyCount = existing?.length ?? 0;
 
@@ -53,7 +53,7 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
     lng: longitude,
     radius_meters: radius,
     exclude_user_id: req.userId,
-    cuisine_filter: cuisine ?? null,
+    cuisine_filters: cuisine ? [cuisine.toLowerCase()] : null,
   });
 
   if (error) {
