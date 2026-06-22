@@ -88,8 +88,12 @@ export default function SessionsScreen() {
       api.sessions.get(session.id)
         .then(({ session: latest }) => {
           if (latest.status !== session.status) {
-            setSession(latest);
-            if (latest.status === "swiping") router.push("/(tabs)/swipe");
+            if (latest.status === "closed") {
+              setSession(null);
+            } else {
+              setSession(latest);
+              if (latest.status === "swiping") router.push("/(tabs)/swipe");
+            }
           }
         })
         .catch(() => {});
@@ -98,11 +102,13 @@ export default function SessionsScreen() {
 
   // Poll every 3 s via backend so RLS never blocks the status check
   useEffect(() => {
-    if (!session || session.status !== "active") return;
+    if (!session || (session.status !== "active" && session.status !== "swiping")) return;
     const interval = setInterval(async () => {
       try {
         const { session: latest } = await api.sessions.get(session.id);
-        if (latest.status === "swiping") {
+        if (latest.status === "completed") {
+          setSession(null);
+        } else if (latest.status === "swiping" && session.status === "active") {
           setSession(latest);
           router.push("/(tabs)/swipe");
         }

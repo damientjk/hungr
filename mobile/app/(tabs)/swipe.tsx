@@ -339,6 +339,13 @@ export default function SwipeScreen() {
   if (phase === "results" && matchResult) {
     const { matches, topMatch, participantCount } = matchResult;
 
+    async function endAndLeave() {
+      if (!session) { router.push("/(tabs)/sessions"); return; }
+      try { await api.sessions.end(session.id); } catch {}
+      setSession(null);
+      router.push("/(tabs)/sessions");
+    }
+
     if (matches.length > 0) {
       const pick = matches[0];
       return (
@@ -351,8 +358,8 @@ export default function SwipeScreen() {
               <RestaurantCard restaurant={pick} variant="stack" />
             </View>
             <PrimaryButton
-              title="Back to Group"
-              onPress={() => router.push("/(tabs)/sessions")}
+              title="End Session"
+              onPress={endAndLeave}
             />
           </View>
         </Screen>
@@ -433,6 +440,7 @@ export default function SwipeScreen() {
       <SwipeHeader
         inviteCode={session.invite_code}
         participantCount={groupProgress.total}
+        remaining={restaurants.length - currentIndex}
       />
 
       <View style={styles.cardStack}>

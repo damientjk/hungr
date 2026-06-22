@@ -144,6 +144,8 @@ export const api = {
         doneCount: number;
         allDone: boolean;
       }>(`/api/sessions/${id}/matches`),
+    end: (id: string) =>
+      request<{ session: Session }>(`/api/sessions/${id}/end`, { method: "PATCH" }),
   },
   bookmarks: {
     list: () => request<{ bookmarks: Restaurant[] }>("/api/bookmarks"),

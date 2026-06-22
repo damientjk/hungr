@@ -419,6 +419,40 @@ export async function refreshSessionRestaurants(req: AuthRequest, res: Response)
   res.json({ restaurants });
 }
 
+export async function endSession(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+
+  const { data: session, error: fetchError } = await supabase
+    .from("sessions")
+    .select("owner_id, status")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (session.owner_id !== req.userId) {
+    res.status(403).json({ error: "Only the session owner can end the session" });
+    return;
+  }
+
+  const { data: updated, error } = await supabase
+    .from("sessions")
+    .update({ status: "completed" })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    res.status(500).json({ error: "Failed to end session" });
+    return;
+  }
+
+  res.json({ session: updated });
+}
+
 export async function getSessionMatches(req: AuthRequest, res: Response) {
   const { id } = req.params;
 

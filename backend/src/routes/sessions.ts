@@ -5,6 +5,7 @@ import {
   createSession,
   joinSession,
   startSwiping,
+  endSession,
   getSessionRestaurants,
   refreshSessionRestaurants,
   getSessionMatches,
@@ -21,5 +22,6 @@ router.patch("/:id/start", startSwiping);
 router.get("/:id/restaurants", getSessionRestaurants);
 router.post("/:id/restaurants", refreshSessionRestaurants);
 router.get("/:id/matches", getSessionMatches);
+router.patch("/:id/end", endSession);
 
 export default router;
