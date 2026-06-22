@@ -106,7 +106,7 @@ export default function SessionsScreen() {
     const interval = setInterval(async () => {
       try {
         const { session: latest } = await api.sessions.get(session.id);
-        if (latest.status === "completed") {
+        if (latest.status === "closed") {
           setSession(null);
         } else if (latest.status === "swiping" && session.status === "active") {
           setSession(latest);

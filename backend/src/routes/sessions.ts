@@ -6,6 +6,7 @@ import {
   joinSession,
   startSwiping,
   endSession,
+  listUserSessions,
   getSessionRestaurants,
   refreshSessionRestaurants,
   getSessionMatches,
@@ -15,6 +16,7 @@ const router = Router();
 
 router.use(requireAuth);
 
+router.get("/", listUserSessions);
 router.post("/", createSession);
 router.post("/join/:code", joinSession);
 router.get("/:id", getSession);

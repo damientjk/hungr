@@ -146,6 +146,8 @@ export const api = {
       }>(`/api/sessions/${id}/matches`),
     end: (id: string) =>
       request<{ session: Session }>(`/api/sessions/${id}/end`, { method: "PATCH" }),
+    list: () =>
+      request<{ sessions: SessionSummary[] }>("/api/sessions"),
   },
   bookmarks: {
     list: () => request<{ bookmarks: Restaurant[] }>("/api/bookmarks"),
@@ -185,6 +187,15 @@ export interface Session {
   halal: boolean;
   vegetarian: boolean;
   created_at: string;
+}
+
+export interface SessionSummary {
+  id: string;
+  name: string;
+  created_at: string;
+  owner_id: string;
+  participant_count: number;
+  top_match_name: string | null;
 }
 
 /** Filters the owner configures before starting a session. */

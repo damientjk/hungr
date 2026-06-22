@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { api, Restaurant, SwipeDirection } from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
 import { RestaurantCard } from "@/src/components/RestaurantCard";
 import { useSession } from "@/src/lib/SessionContext";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Screen } from "@/src/components/ui/Screen";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
 import { SwipeActionBar } from "@/src/components/ui/SwipeActionBar";
@@ -137,12 +137,14 @@ export default function SwipeScreen() {
     return () => clearInterval(interval);
   }, [session?.id, session?.status]);
 
-  useEffect(() => {
-    api.bookmarks
-      .list()
-      .then(({ bookmarks }) => setBookmarkedIds(new Set(bookmarks.map((b) => b.id))))
-      .catch(() => {});
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      api.bookmarks
+        .list()
+        .then(({ bookmarks }) => setBookmarkedIds(new Set(bookmarks.map((b) => b.id))))
+        .catch(() => {});
+    }, [])
+  );
 
   useEffect(() => {
     if (!session || session.status === "swiping") return;

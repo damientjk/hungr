@@ -440,7 +440,7 @@ export async function endSession(req: AuthRequest, res: Response) {
 
   const { data: updated, error } = await supabase
     .from("sessions")
-    .update({ status: "completed" })
+    .update({ status: "closed" })
     .eq("id", id)
     .select()
     .single();
@@ -451,6 +451,76 @@ export async function endSession(req: AuthRequest, res: Response) {
   }
 
   res.json({ session: updated });
+}
+
+export async function listUserSessions(req: AuthRequest, res: Response) {
+  // Find all session IDs this user participates in
+  const { data: participations } = await supabase
+    .from("session_participants")
+    .select("session_id")
+    .eq("user_id", req.userId);
+
+  const sessionIds = (participations ?? []).map((p: any) => p.session_id);
+
+  if (sessionIds.length === 0) {
+    res.json({ sessions: [] });
+    return;
+  }
+
+  // Fetch closed sessions the user is part of
+  const { data: sessions, error } = await supabase
+    .from("sessions")
+    .select("id, name, created_at, owner_id")
+    .in("id", sessionIds)
+    .eq("status", "closed")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    res.status(500).json({ error: "Failed to fetch sessions" });
+    return;
+  }
+
+  if (!sessions || sessions.length === 0) {
+    res.json({ sessions: [] });
+    return;
+  }
+
+  // Participant counts in one query
+  const { data: participantRows } = await supabase
+    .from("session_participants")
+    .select("session_id")
+    .in("session_id", sessions.map((s: any) => s.id));
+
+  const countBySession = new Map<string, number>();
+  for (const row of participantRows ?? []) {
+    countBySession.set(row.session_id, (countBySession.get(row.session_id) ?? 0) + 1);
+  }
+
+  // Top match name per session (best-effort; skip on error)
+  const topMatchNames = new Map<string, string | null>();
+  await Promise.all(
+    sessions.map(async (s: any) => {
+      try {
+        const { data: matches } = await supabase.rpc("get_session_matches", {
+          session_id: s.id,
+        });
+        topMatchNames.set(s.id, matches?.[0]?.name ?? null);
+      } catch {
+        topMatchNames.set(s.id, null);
+      }
+    })
+  );
+
+  const result = sessions.map((s: any) => ({
+    id: s.id,
+    name: s.name,
+    created_at: s.created_at,
+    owner_id: s.owner_id,
+    participant_count: countBySession.get(s.id) ?? 0,
+    top_match_name: topMatchNames.get(s.id) ?? null,
+  }));
+
+  res.json({ sessions: result });
 }
 
 export async function getSessionMatches(req: AuthRequest, res: Response) {
