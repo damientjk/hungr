@@ -55,15 +55,17 @@ app.use("/api/restaurants", restaurantRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
 
-// Proxy everything else to the Expo Metro dev server (web)
-app.use(
-  "/",
-  createProxyMiddleware({
-    target: "http://localhost:8081",
-    changeOrigin: true,
-    ws: true,
-  })
-);
+// Proxy everything else to the Expo Metro dev server (web, dev only)
+if (process.env.NODE_ENV !== "production") {
+  app.use(
+    "/",
+    createProxyMiddleware({
+      target: "http://localhost:8081",
+      changeOrigin: true,
+      ws: true,
+    })
+  );
+}
 
 app.listen(PORT, () => {
   console.log(`Hungr backend running on port ${PORT}`);

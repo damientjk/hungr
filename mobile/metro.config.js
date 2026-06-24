@@ -1,8 +1,24 @@
 const { getDefaultConfig } = require("expo/metro-config");
+const path = require("path");
 const http = require("http");
 const https = require("https");
 
 const config = getDefaultConfig(__dirname);
+
+// @supabase/supabase-js ESM build uses `import(variable)` for optional OTel
+// tracing, which Hermes cannot compile. Force the CJS build instead.
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === "@supabase/supabase-js") {
+    return {
+      filePath: path.resolve(
+        __dirname,
+        "node_modules/@supabase/supabase-js/dist/index.cjs"
+      ),
+      type: "sourceFile",
+    };
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
 
 /** Backend target for web dev proxy (avoids CORS from localhost:8081). */
 const API_TARGET = (
