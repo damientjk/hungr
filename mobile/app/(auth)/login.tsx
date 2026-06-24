@@ -23,7 +23,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <AuthLayout subtitle="Swipe right on dinner.">
+    <AuthLayout subtitle="Swipe. Match. Eat.">
       <TextInput
         style={authInputStyle.input}
         placeholder="Email"

@@ -115,7 +115,7 @@ export function SessionFilters({ value, onChange, coords }: Props) {
         <Text style={styles.sliderValue}>{distanceKm} km</Text>
       </View>
       <Slider
-        minimumValue={500}
+        minimumValue={1000}
         maximumValue={20000}
         step={500}
         value={value.maxDistance}

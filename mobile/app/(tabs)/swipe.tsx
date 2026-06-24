@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,11 +9,13 @@ import {
   Dimensions,
   Alert,
   Linking,
+  ScrollView,
 } from "react-native";
 import { api, Restaurant, SwipeDirection } from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
 import { RestaurantCard } from "@/src/components/RestaurantCard";
 import { useSession } from "@/src/lib/SessionContext";
+import { useAuth } from "@/src/hooks/useAuth";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Screen } from "@/src/components/ui/Screen";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
@@ -73,8 +75,10 @@ function GateView({
 
 export default function SwipeScreen() {
   const { session, setSession } = useSession();
+  const { session: authSession } = useAuth();
   const router = useRouter();
   const { coords } = useLocation();
+  const isOwner = !!session && !!authSession && session.owner_id === authSession.user.id;
   const hasFetchedRef = useRef(false);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(false);
@@ -91,6 +95,12 @@ export default function SwipeScreen() {
     inputRange: [-width / 2, 0, width / 2],
     outputRange: ["-15deg", "0deg", "15deg"],
   });
+
+  const nextCardProgress = useRef(new Animated.Value(0)).current;
+  const currentCardOpacity = useRef(new Animated.Value(1)).current;
+  const nextCardScale = nextCardProgress.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });
+  const nextCardOpacity = nextCardProgress.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
+  const nextCardTranslateY = nextCardProgress.interpolate({ inputRange: [0, 1], outputRange: [12, 0] });
 
   // Refs so PanResponder callbacks always see the latest values without being recreated.
   const swipingRef = useRef(false);
@@ -117,6 +127,11 @@ export default function SwipeScreen() {
       },
     })
   ).current;
+
+  useLayoutEffect(() => {
+    currentCardOpacity.setValue(1);
+    nextCardProgress.setValue(0);
+  }, [currentIndex]);
 
   useEffect(() => {
     hasFetchedRef.current = false;
@@ -237,7 +252,26 @@ export default function SwipeScreen() {
       try {
         const result = await api.sessions.matches(session.id);
         setMatchResult(result);
-        if (result.allDone) setPhase("results");
+        if (result.allDone) {
+          setPhase("results");
+        } else if (result.doneCount === 0 && result.participantCount > 0) {
+          // Owner started a new batch — reset and swipe again
+          fetchRestaurants(false);
+        }
+      } catch {}
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [phase, session?.id]);
+
+  useEffect(() => {
+    if (phase !== "results" || !session) return;
+    const interval = setInterval(async () => {
+      try {
+        const result = await api.sessions.matches(session.id);
+        if (result.doneCount === 0 && result.participantCount > 0) {
+          // Owner started a new batch — reset and swipe again
+          fetchRestaurants(false);
+        }
       } catch {}
     }, 3000);
     return () => clearInterval(interval);
@@ -248,15 +282,23 @@ export default function SwipeScreen() {
     swipingRef.current = true;
     setSwiping(true);
     const toX = direction === "like" ? width * 1.5 : -width * 1.5;
-    Animated.timing(position, {
-      toValue: { x: toX, y: 0 },
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
+    Animated.parallel([
+      Animated.timing(position, {
+        toValue: { x: toX, y: 0 },
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(nextCardProgress, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
       const restaurant = restaurants[currentIndex];
       if (restaurant) {
         api.restaurants.swipe(restaurant.id, direction, session.id).catch(console.error);
       }
+      currentCardOpacity.setValue(0);
       position.setValue({ x: 0, y: 0 });
       setCurrentIndex((i) => i + 1);
       swipingRef.current = false;
@@ -332,7 +374,7 @@ export default function SwipeScreen() {
 
   if (phase === "waiting" && matchResult) {
     return (
-      <Screen>
+      <Screen edges={["top"]}>
         <View style={styles.resultContainer}>
           <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: spacing.lg }} />
           <Text style={styles.resultTitle}>You're done!</Text>
@@ -358,36 +400,37 @@ export default function SwipeScreen() {
       router.push("/(tabs)/sessions");
     }
 
+    function settleForThis() {
+      router.push("/(tabs)/sessions");
+    }
+
     if (matches.length > 0) {
       const pick = matches[0];
       return (
-        <Screen>
-          <View style={styles.resultContainer}>
+        <Screen edges={["top"]}>
+          <ScrollView style={styles.flex1} contentContainerStyle={styles.resultScroll} showsVerticalScrollIndicator={false}>
             <Text style={styles.resultEmoji}>🎉</Text>
             <Text style={styles.resultTitle}>Everyone agrees!</Text>
             <Text style={styles.resultSubtitle}>Your group match</Text>
             <View style={styles.resultCardWrap}>
-              <RestaurantCard restaurant={pick} variant="stack" />
+              <RestaurantCard restaurant={pick} variant="stack" cardHeight={260} />
             </View>
-            <PrimaryButton
-              title="End Session"
-              onPress={endAndLeave}
-            />
-          </View>
+            <PrimaryButton title="End Session" onPress={endAndLeave} />
+          </ScrollView>
         </Screen>
       );
     }
 
     return (
-      <Screen>
-        <View style={styles.resultContainer}>
+      <Screen edges={["top"]}>
+        <ScrollView style={styles.flex1} contentContainerStyle={styles.resultScroll} showsVerticalScrollIndicator={false}>
           <Text style={styles.resultEmoji}>🤔</Text>
           <Text style={styles.resultTitle}>No full match yet</Text>
           <Text style={styles.resultSubtitle}>Most popular across the group</Text>
 
           {topMatch ? (
             <View style={styles.resultCardWrap}>
-              <RestaurantCard restaurant={topMatch} variant="stack" />
+              <RestaurantCard restaurant={topMatch} variant="stack" cardHeight={260} />
               <View style={styles.likeBar}>
                 <Text style={styles.likeCount}>
                   ❤️ {topMatch.likeCount} / {participantCount} members liked this
@@ -398,17 +441,23 @@ export default function SwipeScreen() {
             <Text style={styles.noLikesText}>Nobody liked any restaurants yet.</Text>
           )}
 
-          <PrimaryButton
-            title={`Try another ${BATCH_SIZE}`}
-            onPress={() => fetchRestaurants(true)}
-          />
-          <PrimaryButton
-            title="Back to Group"
-            onPress={() => router.push("/(tabs)/sessions")}
-            variant="secondary"
-            style={{ marginTop: spacing.sm }}
-          />
-        </View>
+          {isOwner ? (
+            <>
+              <PrimaryButton
+                title={`Try another ${BATCH_SIZE}`}
+                onPress={() => fetchRestaurants(true)}
+              />
+              <PrimaryButton
+                title="Settle for this"
+                onPress={settleForThis}
+                variant="secondary"
+                style={{ marginTop: spacing.sm }}
+              />
+            </>
+          ) : (
+            <Text style={styles.ownerDecideText}>Waiting for the owner to decide…</Text>
+          )}
+        </ScrollView>
       </Screen>
     );
   }
@@ -457,18 +506,22 @@ export default function SwipeScreen() {
 
       <View style={styles.cardStack}>
         {next && (
-          <View style={[styles.cardWrapper, styles.nextCard]}>
+          <Animated.View style={[styles.cardWrapper, {
+            opacity: nextCardOpacity,
+            transform: [{ scale: nextCardScale }, { translateY: nextCardTranslateY }],
+          }]}>
             <RestaurantCard
               restaurant={next}
               variant="stack"
               overlay={cardOverlay}
             />
-          </View>
+          </Animated.View>
         )}
         <Animated.View
           style={[
             styles.cardWrapper,
             {
+              opacity: currentCardOpacity,
               transform: [
                 { translateX: position.x },
                 { translateY: position.y },
@@ -539,15 +592,20 @@ const styles = StyleSheet.create({
   cardWrapper: {
     position: "absolute",
   },
-  nextCard: {
-    transform: [{ scale: 0.96 }, { translateY: 12 }],
-    opacity: 0.9,
+  flex1: {
+    flex: 1,
   },
   resultContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.lg,
+  },
+  resultScroll: {
+    alignItems: "center",
+    padding: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
   },
   resultEmoji: {
     fontSize: 64,
@@ -589,6 +647,13 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.regular,
     color: colors.textLight,
     marginBottom: spacing.lg,
+  },
+  ownerDecideText: {
+    fontSize: 15,
+    fontFamily: fontFamily.regular,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginTop: spacing.md,
   },
   doneCard: {
     backgroundColor: colors.surface,

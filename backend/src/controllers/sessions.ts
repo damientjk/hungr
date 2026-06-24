@@ -8,7 +8,7 @@ import { geocodeAddress } from "../lib/geocode";
 const CreateSessionSchema = z.object({
   name: z.string().min(1).max(100),
   cuisineFilters: z.array(z.string()).default([]),
-  maxDistance: z.number().min(100).max(50000).default(5000),
+  maxDistance: z.number().min(1000).max(50000).default(5000),
 });
 
 // ── Filters ───────────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ const StartSchema = z.object({
   priceMax: z.coerce.number().int().min(1).max(4).default(4),
   halal: z.boolean().default(false),
   vegetarian: z.boolean().default(false),
-  maxDistance: z.coerce.number().min(100).max(50000).default(5000),
+  maxDistance: z.coerce.number().min(1000).max(50000).default(5000),
 });
 
 // Fetch nearby restaurants into DB if needed, then store top N in session_restaurants
@@ -366,25 +366,25 @@ export async function refreshSessionRestaurants(req: AuthRequest, res: Response)
   }
   const { latitude, longitude } = parsed.data;
 
-  // Verify the requester is a session participant
-  const { data: participant } = await supabase
-    .from("session_participants")
-    .select("user_id")
-    .eq("session_id", id)
-    .eq("user_id", req.userId)
+  // Only the owner can trigger a new batch
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("owner_id, cuisine_filters, max_distance, price_min, price_max, halal, vegetarian")
+    .eq("id", id)
     .single();
 
-  if (!participant) {
-    res.status(403).json({ error: "Not a session participant" });
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
     return;
   }
 
-  // Re-seed using the filters the owner configured for this session.
-  const { data: session } = await supabase
-    .from("sessions")
-    .select("cuisine_filters, max_distance, price_min, price_max, halal, vegetarian")
-    .eq("id", id)
-    .single();
+  if (session.owner_id !== req.userId) {
+    res.status(403).json({ error: "Only the session owner can try another batch" });
+    return;
+  }
+
+  // Clear all swipes so every member's done status resets for the new batch
+  await supabase.from("swipes").delete().eq("session_id", id);
 
   const filters: SessionFilters = {
     cuisineFilters: session?.cuisine_filters ?? [],

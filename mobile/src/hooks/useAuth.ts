@@ -31,7 +31,9 @@ export function useAuth() {
 
   const resetPassword = (email: string) =>
     supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "hungr://reset-password",
+      redirectTo: __DEV__
+        ? "exp+hungr://reset-password"
+        : "hungr://reset-password",
     });
 
   const updatePassword = (newPassword: string) =>
