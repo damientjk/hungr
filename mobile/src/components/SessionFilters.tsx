@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Switch } from "react-native";
 import Slider from "@react-native-community/slider";
-import { CUISINE_OPTIONS, SessionFilterValues } from "@/src/lib/api";
+import { CUISINE_OPTIONS, SessionFilterValues, DEFAULT_FILTERS } from "@/src/lib/api";
 import { colors } from "@/src/theme/colors";
 import { fontFamily } from "@/src/theme/typography";
 import { spacing } from "@/src/theme/spacing";
@@ -25,6 +25,7 @@ export function SessionFilters({ value, onChange, coords }: Props) {
   const patch = (partial: Partial<SessionFilterValues>) =>
     onChange({ ...value, ...partial });
 
+
   const toggleCuisine = (cuisine: string) => {
     const key = cuisine.toLowerCase();
     const has = value.cuisineFilters.includes(key);
@@ -39,7 +40,12 @@ export function SessionFilters({ value, onChange, coords }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Filters</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Filters</Text>
+        <TouchableOpacity onPress={() => onChange(DEFAULT_FILTERS)} hitSlop={8}>
+          <Text style={styles.resetBtn}>Reset</Text>
+        </TouchableOpacity>
+      </View>
       <Text style={styles.hint}>Set these before you start swiping.</Text>
 
       {/* Cuisines */}
@@ -72,7 +78,8 @@ export function SessionFilters({ value, onChange, coords }: Props) {
         <Switch
           value={value.halal}
           onValueChange={(v) => patch({ halal: v })}
-          trackColor={{ true: colors.primary, false: colors.border }}
+          trackColor={{ true: colors.primary, false: "#FFDEBF" }}
+          ios_backgroundColor="#FFDEBF"
           thumbColor="#fff"
         />
       </View>
@@ -81,37 +88,22 @@ export function SessionFilters({ value, onChange, coords }: Props) {
         <Switch
           value={value.vegetarian}
           onValueChange={(v) => patch({ vegetarian: v })}
-          trackColor={{ true: colors.primary, false: colors.border }}
+          trackColor={{ true: colors.primary, false: "#FFDEBF" }}
+          ios_backgroundColor="#FFDEBF"
           thumbColor="#fff"
         />
       </View>
 
       {/* Price range */}
-      <Text style={styles.label}>Price range</Text>
-      <Text style={styles.priceSummary}>
-        {value.priceMin === value.priceMax
-          ? `${priceEstimate(value.priceMin)} per person`
-          : `${priceEstimate(value.priceMin)}  –  ${priceEstimate(value.priceMax)} per person`}
-      </Text>
-
-      <Text style={styles.subLabel}>Cheapest: {priceEstimate(value.priceMin)}</Text>
+      <View style={styles.sliderHeader}>
+        <Text style={styles.label}>Max price</Text>
+        <Text style={styles.sliderValue}>{priceEstimate(Math.round(value.priceMax))} per person</Text>
+      </View>
       <Slider
         minimumValue={1}
         maximumValue={4}
-        step={1}
-        value={value.priceMin}
-        onValueChange={(v) => patch({ priceMin: v, priceMax: Math.max(v, value.priceMax) })}
-        minimumTrackTintColor={colors.primary}
-        maximumTrackTintColor={colors.border}
-        thumbTintColor={colors.primary}
-      />
-      <Text style={styles.subLabel}>Priciest: {priceEstimate(value.priceMax)}</Text>
-      <Slider
-        minimumValue={1}
-        maximumValue={4}
-        step={1}
         value={value.priceMax}
-        onValueChange={(v) => patch({ priceMax: v, priceMin: Math.min(v, value.priceMin) })}
+        onValueChange={(v) => patch({ priceMin: 1, priceMax: v })}
         minimumTrackTintColor={colors.primary}
         maximumTrackTintColor={colors.border}
         thumbTintColor={colors.primary}
@@ -158,7 +150,17 @@ const styles = StyleSheet.create({
     zIndex: 10,
     elevation: 10,
   },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   title: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.text },
+  resetBtn: {
+    fontSize: 13,
+    fontFamily: fontFamily.semiBold,
+    color: colors.primary,
+  },
   hint: {
     fontSize: 12,
     fontFamily: fontFamily.regular,
@@ -172,12 +174,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: spacing.md,
     marginBottom: spacing.sm,
-  },
-  subLabel: {
-    fontSize: 12,
-    fontFamily: fontFamily.regular,
-    color: colors.textMuted,
-    marginTop: 4,
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
@@ -212,12 +208,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     color: colors.primary,
     marginTop: spacing.md,
-  },
-  priceSummary: {
-    fontSize: 15,
-    fontFamily: fontFamily.bold,
-    color: colors.primary,
-    marginBottom: 4,
   },
   legend: {
     fontSize: 11,

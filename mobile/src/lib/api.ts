@@ -238,15 +238,15 @@ export const CUISINE_OPTIONS = [
   "Fast food",
   "Cafe",
   "Dessert",
-  "Seafood",
+  "Hawker",
 ] as const;
 
 /** Sensible defaults for a fresh filter panel. */
 export const DEFAULT_FILTERS: SessionFilterValues = {
   cuisineFilters: [],
   priceMin: 1,
-  priceMax: 4,
+  priceMax: 2.5,
   halal: false,
   vegetarian: false,
-  maxDistance: 5000,
+  maxDistance: 10000,
 };

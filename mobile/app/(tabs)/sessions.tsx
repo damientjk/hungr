@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -36,6 +36,11 @@ export default function SessionsScreen() {
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SessionFilterValues>(DEFAULT_FILTERS);
+  const prevSessionIdRef = useRef<string | null>(null);
+  if (session?.id !== prevSessionIdRef.current) {
+    prevSessionIdRef.current = session?.id ?? null;
+    if (filters !== DEFAULT_FILTERS) setFilters(DEFAULT_FILTERS);
+  }
   const [matchResult, setMatchResult] = useState<{
     matches: Restaurant[];
     topMatch: (Restaurant & { likeCount: number }) | null;
@@ -182,6 +187,8 @@ export default function SessionsScreen() {
         latitude: coords.latitude,
         longitude: coords.longitude,
         ...filters,
+        priceMin: Math.round(filters.priceMin),
+        priceMax: Math.round(filters.priceMax),
         address: filters.address?.trim() ? filters.address.trim() : undefined,
       });
       setSession(updated);

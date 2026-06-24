@@ -91,17 +91,23 @@ export default function SwipeScreen() {
     inputRange: [-width / 2, 0, width / 2],
     outputRange: ["-15deg", "0deg", "15deg"],
   });
+
+  // Refs so PanResponder callbacks always see the latest values without being recreated.
+  const swipingRef = useRef(false);
+  const swipeCardRef = useRef<(direction: SwipeDirection) => void>(() => {});
+
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !swiping,
+      onStartShouldSetPanResponder: () => !swipingRef.current,
+      onMoveShouldSetPanResponder: () => !swipingRef.current,
       onPanResponderMove: (_evt, gestureState) => {
         position.setValue({ x: gestureState.dx, y: gestureState.dy });
       },
       onPanResponderRelease: (_evt, gestureState) => {
         if (gestureState.dx > SWIPE_THRESHOLD) {
-          swipeCard("like");
+          swipeCardRef.current("like");
         } else if (gestureState.dx < -SWIPE_THRESHOLD) {
-          swipeCard("dislike");
+          swipeCardRef.current("dislike");
         } else {
           Animated.spring(position, {
             toValue: { x: 0, y: 0 },
@@ -238,7 +244,8 @@ export default function SwipeScreen() {
   }, [phase, session?.id]);
 
   function swipeCard(direction: SwipeDirection) {
-    if (swiping || !session) return;
+    if (swipingRef.current || !session) return;
+    swipingRef.current = true;
     setSwiping(true);
     const toX = direction === "like" ? width * 1.5 : -width * 1.5;
     Animated.timing(position, {
@@ -252,9 +259,12 @@ export default function SwipeScreen() {
       }
       position.setValue({ x: 0, y: 0 });
       setCurrentIndex((i) => i + 1);
+      swipingRef.current = false;
       setSwiping(false);
     });
   }
+  // Keep the ref pointing at the latest swipeCard so PanResponder always calls the current one.
+  swipeCardRef.current = swipeCard;
 
   if (!session) {
     return (
