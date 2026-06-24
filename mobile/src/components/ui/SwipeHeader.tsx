@@ -9,6 +9,7 @@ import { fontFamily } from "@/src/theme/typography";
 interface Props {
   inviteCode: string;
   participantCount?: number;
+  remaining?: number;
 }
 
 function formatInviteCode(code: string): string {
@@ -19,7 +20,7 @@ function formatInviteCode(code: string): string {
   return c;
 }
 
-export function SwipeHeader({ inviteCode, participantCount = 1 }: Props) {
+export function SwipeHeader({ inviteCode, participantCount = 1, remaining }: Props) {
   const router = useRouter();
   const avatarCount = Math.min(3, Math.max(1, participantCount));
   const labels = ["J", "D", "Y", "A", "M"];
@@ -47,13 +48,18 @@ export function SwipeHeader({ inviteCode, participantCount = 1 }: Props) {
         </View>
       </View>
 
-      <TouchableOpacity
-        style={styles.menuBtn}
-        onPress={() => router.push("/(tabs)/sessions")}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Ionicons name="menu" size={22} color={colors.text} />
-      </TouchableOpacity>
+      <View style={styles.rightSlot}>
+        {remaining !== undefined && (
+          <Text style={styles.counter}>{remaining} left</Text>
+        )}
+        <TouchableOpacity
+          style={styles.menuBtn}
+          onPress={() => router.push("/(tabs)/sessions")}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="menu" size={22} color={colors.text} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -105,6 +111,16 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     color: colors.textMuted,
     letterSpacing: 1,
+  },
+  rightSlot: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  counter: {
+    fontSize: 13,
+    fontFamily: fontFamily.semiBold,
+    color: colors.primary,
   },
   menuBtn: {
     width: 40,

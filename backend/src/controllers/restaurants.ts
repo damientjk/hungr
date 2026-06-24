@@ -2,7 +2,29 @@ import { Response } from "express";
 import { z } from "zod";
 import { supabase } from "../lib/supabase";
 import { fetchAllNearbyRestaurants } from "../lib/places";
+import { autocompletePlaces } from "../lib/geocode";
 import { AuthRequest } from "../middleware/auth";
+
+const AutocompleteSchema = z.object({
+  input: z.string().min(1).max(200),
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
+});
+
+export async function getPlaceAutocomplete(req: AuthRequest, res: Response) {
+  const parsed = AutocompleteSchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: "input is required" });
+    return;
+  }
+  const { input, latitude, longitude } = parsed.data;
+  const bias =
+    latitude !== undefined && longitude !== undefined
+      ? { latitude, longitude }
+      : undefined;
+  const suggestions = await autocompletePlaces(input, bias);
+  res.json({ suggestions });
+}
 
 const NearbySchema = z.object({
   latitude: z.coerce.number().min(-90).max(90),
@@ -27,7 +49,7 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
     lng: longitude,
     radius_meters: radius,
     exclude_user_id: req.userId,
-    cuisine_filter: null,
+    cuisine_filters: null,
   });
   const nearbyCount = existing?.length ?? 0;
 
@@ -53,7 +75,7 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
     lng: longitude,
     radius_meters: radius,
     exclude_user_id: req.userId,
-    cuisine_filter: cuisine ?? null,
+    cuisine_filters: cuisine ? [cuisine.toLowerCase()] : null,
   });
 
   if (error) {

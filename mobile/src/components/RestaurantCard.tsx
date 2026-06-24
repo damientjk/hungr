@@ -29,9 +29,10 @@ interface Props {
   restaurant: Restaurant;
   variant?: "stack" | "compact";
   overlay?: StackOverlay;
+  cardHeight?: number;
 }
 
-export function RestaurantCard({ restaurant, variant = "stack", overlay }: Props) {
+export function RestaurantCard({ restaurant, variant = "stack", overlay, cardHeight }: Props) {
   if (variant === "compact") {
     return <CompactCard restaurant={restaurant} />;
   }
@@ -50,7 +51,7 @@ export function RestaurantCard({ restaurant, variant = "stack", overlay }: Props
       : null;
 
   return (
-    <View style={styles.stackCard}>
+    <View style={[styles.stackCard, cardHeight != null && { height: cardHeight }]}>
       {restaurant.photo_url ? (
         <Image
           source={{ uri: restaurant.photo_url }}

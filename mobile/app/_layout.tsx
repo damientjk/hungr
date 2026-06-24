@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as Linking from "expo-linking";
 import {
   useFonts,
   Nunito_400Regular,
@@ -10,6 +11,7 @@ import {
 } from "@expo-google-fonts/nunito";
 import { useAuth } from "@/src/hooks/useAuth";
 import { LoadingScreen } from "@/src/components/LoadingScreen";
+import { supabase } from "@/src/lib/supabase";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -22,6 +24,18 @@ export default function RootLayout() {
   const { session, loading, authEvent } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  useEffect(() => {
+    const handleUrl = (url: string) => {
+      if (url.includes("code=") || url.includes("access_token")) {
+        supabase.auth.exchangeCodeForSession(url).catch(() => {});
+      }
+    };
+
+    Linking.getInitialURL().then((url) => { if (url) handleUrl(url); });
+    const sub = Linking.addEventListener("url", ({ url }) => handleUrl(url));
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (loading || !fontsLoaded) return;

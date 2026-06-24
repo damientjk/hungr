@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -7,12 +7,14 @@ import {
   StyleSheet,
   Share,
   FlatList,
+  ScrollView,
   ActivityIndicator,
   Alert,
   Linking,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { api, Restaurant } from "@/src/lib/api";
+import { api, Restaurant, SessionFilterValues, DEFAULT_FILTERS } from "@/src/lib/api";
+import { SessionFilters } from "@/src/components/SessionFilters";
 import { useSession } from "@/src/lib/SessionContext";
 import { useLocation } from "@/src/hooks/useLocation";
 import { supabase } from "@/src/lib/supabase";
@@ -33,6 +35,12 @@ export default function SessionsScreen() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<SessionFilterValues>(DEFAULT_FILTERS);
+  const prevSessionIdRef = useRef<string | null>(null);
+  if (session?.id !== prevSessionIdRef.current) {
+    prevSessionIdRef.current = session?.id ?? null;
+    if (filters !== DEFAULT_FILTERS) setFilters(DEFAULT_FILTERS);
+  }
   const [matchResult, setMatchResult] = useState<{
     matches: Restaurant[];
     topMatch: (Restaurant & { likeCount: number }) | null;
@@ -85,8 +93,12 @@ export default function SessionsScreen() {
       api.sessions.get(session.id)
         .then(({ session: latest }) => {
           if (latest.status !== session.status) {
-            setSession(latest);
-            if (latest.status === "swiping") router.push("/(tabs)/swipe");
+            if (latest.status === "closed") {
+              setSession(null);
+            } else {
+              setSession(latest);
+              if (latest.status === "swiping") router.push("/(tabs)/swipe");
+            }
           }
         })
         .catch(() => {});
@@ -95,11 +107,13 @@ export default function SessionsScreen() {
 
   // Poll every 3 s via backend so RLS never blocks the status check
   useEffect(() => {
-    if (!session || session.status !== "active") return;
+    if (!session || (session.status !== "active" && session.status !== "swiping")) return;
     const interval = setInterval(async () => {
       try {
         const { session: latest } = await api.sessions.get(session.id);
-        if (latest.status === "swiping") {
+        if (latest.status === "closed") {
+          setSession(null);
+        } else if (latest.status === "swiping" && session.status === "active") {
           setSession(latest);
           router.push("/(tabs)/swipe");
         }
@@ -172,6 +186,10 @@ export default function SessionsScreen() {
       const { session: updated } = await api.sessions.start(session.id, {
         latitude: coords.latitude,
         longitude: coords.longitude,
+        ...filters,
+        priceMin: Math.round(filters.priceMin),
+        priceMax: Math.round(filters.priceMax),
+        address: filters.address?.trim() ? filters.address.trim() : undefined,
       });
       setSession(updated);
       router.push("/(tabs)/swipe");
@@ -195,6 +213,10 @@ export default function SessionsScreen() {
 
     return (
       <Screen style={styles.container}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.activeScroll}
+        >
         <Text style={styles.header}>Group Session</Text>
 
         <View style={styles.activeSession}>
@@ -217,9 +239,10 @@ export default function SessionsScreen() {
           )}
         </View>
 
-        {/* Action buttons */}
+        {/* Owner filters + start */}
         {isOwner && !isSwiping && (
           <>
+            <SessionFilters value={filters} onChange={setFilters} coords={coords} />
             {startError && <Text style={styles.error}>{startError}</Text>}
             <TouchableOpacity
               style={[styles.startButton, loading && styles.buttonDisabled]}
@@ -317,6 +340,7 @@ export default function SessionsScreen() {
         >
           <Text style={styles.leaveText}>Leave session</Text>
         </TouchableOpacity>
+        </ScrollView>
       </Screen>
     );
   }
@@ -505,12 +529,14 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: 14,
   },
+  activeScroll: {
+    paddingBottom: spacing.lg,
+  },
   matchesSection: {
     backgroundColor: colors.surface,
     borderRadius: spacing.cardRadius,
     padding: 20,
     marginBottom: spacing.md,
-    flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
   },
