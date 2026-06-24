@@ -104,6 +104,16 @@ export const api = {
       }),
     resetSwipes: () =>
       request("/api/restaurants/swipes", { method: "DELETE" }),
+    autocomplete: (input: string, bias?: { latitude: number; longitude: number }) => {
+      const qs = new URLSearchParams({ input });
+      if (bias) {
+        qs.set("latitude", String(bias.latitude));
+        qs.set("longitude", String(bias.longitude));
+      }
+      return request<{ suggestions: { description: string; placeId: string }[] }>(
+        `/api/restaurants/autocomplete?${qs}`
+      );
+    },
   },
   sessions: {
     get: (id: string) =>

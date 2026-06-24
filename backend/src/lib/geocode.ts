@@ -1,5 +1,46 @@
 const KEY = process.env.GOOGLE_PLACES_API_KEY!;
 
+interface AutocompleteResponse {
+  status: string;
+  predictions: { description: string; place_id: string }[];
+}
+
+export interface PlaceSuggestion {
+  description: string;
+  placeId: string;
+}
+
+export async function autocompletePlaces(
+  input: string,
+  bias?: { latitude: number; longitude: number }
+): Promise<PlaceSuggestion[]> {
+  const params = new URLSearchParams({
+    input,
+    types: "geocode|establishment",
+    key: KEY,
+  });
+  if (bias) {
+    params.set("location", `${bias.latitude},${bias.longitude}`);
+    params.set("radius", "50000");
+  }
+
+  const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params.toString()}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = (await res.json()) as AutocompleteResponse;
+    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") return [];
+    return (data.predictions ?? []).map((p) => ({
+      description: p.description,
+      placeId: p.place_id,
+    }));
+  } catch (e) {
+    console.error("Autocomplete failed:", e);
+    return [];
+  }
+}
+
 interface FindPlaceResponse {
   status: string;
   candidates: { geometry: { location: { lat: number; lng: number } } }[];

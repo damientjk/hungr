@@ -235,7 +235,7 @@ export default function SessionsScreen() {
         {/* Owner filters + start */}
         {isOwner && !isSwiping && (
           <>
-            <SessionFilters value={filters} onChange={setFilters} />
+            <SessionFilters value={filters} onChange={setFilters} coords={coords} />
             {startError && <Text style={styles.error}>{startError}</Text>}
             <TouchableOpacity
               style={[styles.startButton, loading && styles.buttonDisabled]}

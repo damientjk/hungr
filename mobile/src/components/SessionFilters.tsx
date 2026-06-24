@@ -1,13 +1,15 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Switch } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Switch } from "react-native";
 import Slider from "@react-native-community/slider";
 import { CUISINE_OPTIONS, SessionFilterValues } from "@/src/lib/api";
 import { colors } from "@/src/theme/colors";
 import { fontFamily } from "@/src/theme/typography";
 import { spacing } from "@/src/theme/spacing";
+import { LocationAutocomplete } from "@/src/components/LocationAutocomplete";
 
 interface Props {
   value: SessionFilterValues;
   onChange: (next: SessionFilterValues) => void;
+  coords?: { latitude: number; longitude: number } | null;
 }
 
 // Rough estimated spend per person, mapped from Google's price_level (1–4).
@@ -19,7 +21,7 @@ const priceEstimate = (n: number) => PRICE_ESTIMATES[n];
  * session: cuisines, dietary options, price range, distance, and the location
  * to search from (defaults to the device's current location).
  */
-export function SessionFilters({ value, onChange }: Props) {
+export function SessionFilters({ value, onChange, coords }: Props) {
   const patch = (partial: Partial<SessionFilterValues>) =>
     onChange({ ...value, ...partial });
 
@@ -133,13 +135,10 @@ export function SessionFilters({ value, onChange }: Props) {
 
       {/* Location */}
       <Text style={styles.label}>Search from</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Current location"
-        placeholderTextColor={colors.textLight}
+      <LocationAutocomplete
         value={value.address ?? ""}
-        onChangeText={(t) => patch({ address: t })}
-        autoCapitalize="words"
+        onChange={(t) => patch({ address: t || undefined })}
+        coords={coords}
       />
       <Text style={styles.hint}>
         Leave blank to use your current location, or type a place or address.
@@ -156,6 +155,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+    zIndex: 10,
+    elevation: 10,
   },
   title: { fontSize: 18, fontFamily: fontFamily.bold, color: colors.text },
   hint: {
@@ -223,15 +224,5 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.regular,
     color: colors.textLight,
     marginTop: 6,
-  },
-  input: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 15,
-    fontFamily: fontFamily.regular,
-    color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
 });

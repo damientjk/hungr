@@ -5,6 +5,7 @@ import {
   getLikedRestaurants,
   recordSwipe,
   resetSwipes,
+  getPlaceAutocomplete,
 } from "../controllers/restaurants";
 
 const router = Router();
@@ -12,6 +13,7 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/nearby", getNearbyRestaurants);
+router.get("/autocomplete", getPlaceAutocomplete);
 router.get("/liked", getLikedRestaurants);
 router.post("/swipe", recordSwipe);
 router.delete("/swipes", resetSwipes);
