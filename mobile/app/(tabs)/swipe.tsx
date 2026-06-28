@@ -10,6 +10,8 @@ import {
   Alert,
   Linking,
   ScrollView,
+  Platform,
+  useWindowDimensions,
 } from "react-native";
 import { api, Restaurant, SwipeDirection } from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
@@ -28,6 +30,8 @@ import { fontFamily } from "@/src/theme/typography";
 const { width } = Dimensions.get("window");
 const SWIPE_THRESHOLD = width * 0.3;
 const BATCH_SIZE = 20;
+/** Height of the bottom tab bar (see app/(tabs)/_layout.tsx). */
+const TAB_BAR_HEIGHT = 64;
 
 type Phase = "swiping" | "loading_results" | "waiting" | "results";
 
@@ -78,6 +82,15 @@ export default function SwipeScreen() {
   const { session: authSession } = useAuth();
   const router = useRouter();
   const { coords } = useLocation();
+  const { height: windowHeight } = useWindowDimensions();
+  // On web, rnw's ScrollView only scrolls when its height is bounded by the
+  // parent chain — which doesn't propagate here, so tall result screens get
+  // clipped. Cap the scroll area to the viewport (minus the tab bar) so it
+  // scrolls. Native measures its own bounded height and needs no cap.
+  const resultScrollStyle =
+    Platform.OS === "web"
+      ? [styles.flex1, { maxHeight: windowHeight - TAB_BAR_HEIGHT }]
+      : styles.flex1;
   const isOwner = !!session && !!authSession && session.owner_id === authSession.user.id;
   const hasFetchedRef = useRef(false);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -408,7 +421,7 @@ export default function SwipeScreen() {
       const pick = matches[0];
       return (
         <Screen edges={["top"]}>
-          <ScrollView style={styles.flex1} contentContainerStyle={styles.resultScroll} showsVerticalScrollIndicator={false}>
+          <ScrollView style={resultScrollStyle} contentContainerStyle={styles.resultScroll} showsVerticalScrollIndicator={false}>
             <Text style={styles.resultEmoji}>🎉</Text>
             <Text style={styles.resultTitle}>Everyone agrees!</Text>
             <Text style={styles.resultSubtitle}>Your group match</Text>
@@ -423,7 +436,7 @@ export default function SwipeScreen() {
 
     return (
       <Screen edges={["top"]}>
-        <ScrollView style={styles.flex1} contentContainerStyle={styles.resultScroll} showsVerticalScrollIndicator={false}>
+        <ScrollView style={resultScrollStyle} contentContainerStyle={styles.resultScroll} showsVerticalScrollIndicator={false}>
           <Text style={styles.resultEmoji}>🤔</Text>
           <Text style={styles.resultTitle}>No full match yet</Text>
           <Text style={styles.resultSubtitle}>Most popular across the group</Text>

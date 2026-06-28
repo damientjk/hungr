@@ -9,13 +9,21 @@ const BACKEND_PORT = 3000;
  * Resolve the backend base URL.
  *
  * - Web: same-origin "" — Metro proxies `/api` to the backend (see metro.config.js).
- * - Native dev (Expo Go): derive the host from the Metro dev-server URI, so the
- *   backend is reached at the SAME IP the app was loaded from. This means the IP
+ * - Native + explicit remote backend: prefer EXPO_PUBLIC_API_URL (e.g. the deployed
+ *   Render URL) so a physical phone in Expo Go reaches it directly. Localhost values
+ *   are ignored here — on a phone "localhost" is the phone itself, not your machine.
+ * - Native dev (no remote set): derive the host from the Metro dev-server URI, so a
+ *   LOCAL backend is reached at the SAME IP the app was loaded from. This means the IP
  *   never has to be hard-coded or updated when the network (Wi-Fi/hotspot) changes.
- * - Fallbacks: an explicit EXPO_PUBLIC_API_URL (e.g. a deployed backend), then localhost.
  */
 function resolveApiUrl(): string {
   if (Platform.OS === "web") return "";
+
+  // Prefer an explicit *remote* backend so Expo Go on a phone reaches it directly.
+  const explicit = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (explicit && !/localhost|127\.0\.0\.1/.test(explicit)) {
+    return explicit;
+  }
 
   // e.g. "172.20.10.5:8081" — the address this app's bundle was served from.
   const hostUri =
@@ -25,8 +33,6 @@ function resolveApiUrl(): string {
   const host = String(hostUri).split(":")[0];
   if (host) return `http://${host}:${BACKEND_PORT}`;
 
-  const explicit = process.env.EXPO_PUBLIC_API_URL;
-  if (explicit) return explicit.replace(/\/$/, "");
   return `http://localhost:${BACKEND_PORT}`;
 }
 
