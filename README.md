@@ -52,3 +52,5 @@ npm run mobile
 Scan the QR in your terminal with Expo Go (or iPhone/Android Camera App).
 
 - This step may take between 30–60 seconds on the first launch as the Render free-tier server takes a while to wake up from sleep.
+
+**Note**: There is no need to run the backend on your device locally for testing as the backend automatically runs on an online service called Render. This ensures that sensitive API keys are not shared with the public. The backend code as well the SQL code for Supabase are still available in the Github repo for reference.
