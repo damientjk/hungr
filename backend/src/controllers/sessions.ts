@@ -18,6 +18,7 @@ interface SessionFilters {
   priceMax: number;
   halal: boolean;
   vegetarian: boolean;
+  vegan: boolean;
 }
 
 /** Normalise cuisine labels: lowercase, trimmed, de-duplicated, non-empty. */
@@ -30,6 +31,7 @@ function effectiveCuisineFilters(f: SessionFilters): string[] {
   const arr = [...f.cuisineFilters];
   if (f.halal) arr.push("halal");
   if (f.vegetarian) arr.push("vegetarian");
+  if (f.vegan) arr.push("vegan");
   return arr;
 }
 
@@ -38,6 +40,7 @@ function buildSearchTags(f: SessionFilters): SearchTag[] {
   const tags: SearchTag[] = f.cuisineFilters.map((c) => ({ keyword: c, label: c }));
   if (f.halal) tags.push({ keyword: "halal", label: "halal" });
   if (f.vegetarian) tags.push({ keyword: "vegetarian", label: "vegetarian" });
+  if (f.vegan) tags.push({ keyword: "vegan", label: "vegan" });
   return tags;
 }
 
@@ -143,6 +146,7 @@ const StartSchema = z.object({
   priceMax: z.coerce.number().int().min(1).max(4).default(4),
   halal: z.boolean().default(false),
   vegetarian: z.boolean().default(false),
+  vegan: z.boolean().default(false),
   maxDistance: z.coerce.number().min(1000).max(50000).default(5000),
 });
 
@@ -263,6 +267,7 @@ export async function startSwiping(req: AuthRequest, res: Response) {
     priceMax,
     halal: input.halal,
     vegetarian: input.vegetarian,
+    vegan: input.vegan,
   };
 
   // Persist the chosen filters so member re-fetches use the same criteria.
@@ -274,6 +279,7 @@ export async function startSwiping(req: AuthRequest, res: Response) {
       price_max: filters.priceMax,
       halal: filters.halal,
       vegetarian: filters.vegetarian,
+      vegan: filters.vegan,
       max_distance: input.maxDistance,
     })
     .eq("id", id);
@@ -369,7 +375,7 @@ export async function refreshSessionRestaurants(req: AuthRequest, res: Response)
   // Only the owner can trigger a new batch
   const { data: session } = await supabase
     .from("sessions")
-    .select("owner_id, cuisine_filters, max_distance, price_min, price_max, halal, vegetarian")
+    .select("owner_id, cuisine_filters, max_distance, price_min, price_max, halal, vegetarian, vegan")
     .eq("id", id)
     .single();
 
@@ -392,6 +398,7 @@ export async function refreshSessionRestaurants(req: AuthRequest, res: Response)
     priceMax: session?.price_max ?? 4,
     halal: session?.halal ?? false,
     vegetarian: session?.vegetarian ?? false,
+    vegan: session?.vegan ?? false,
   };
 
   await seedSessionRestaurants(id, latitude, longitude, session?.max_distance ?? 5000, filters);
