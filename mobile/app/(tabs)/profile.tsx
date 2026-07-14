@@ -7,8 +7,9 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useAuth } from "@/src/hooks/useAuth";
+import { useSession } from "@/src/lib/SessionContext";
 import { api, SessionSummary } from "@/src/lib/api";
 import { Screen } from "@/src/components/ui/Screen";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
@@ -19,11 +20,14 @@ import { screenStyles } from "@/src/theme/screenStyles";
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
+  const { setSession } = useSession();
+  const router = useRouter();
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [pastSessions, setPastSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [restartingId, setRestartingId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -35,6 +39,23 @@ export default function ProfileScreen() {
         .finally(() => setSessionsLoading(false));
     }, [])
   );
+
+  async function handleRestart(s: SessionSummary) {
+    setRestartingId(s.id);
+    try {
+      const { session: newSession } = await api.sessions.create({
+        name: s.name,
+        inviteCode: s.invite_code,
+      });
+      setSession(newSession);
+      router.push("/(tabs)/sessions");
+    } catch (e: any) {
+      // Code may already be in use — navigate to group tab anyway
+      router.push("/(tabs)/sessions");
+    } finally {
+      setRestartingId(null);
+    }
+  }
 
   async function handleReset() {
     setResetting(true);
@@ -112,6 +133,17 @@ export default function ProfileScreen() {
                   <Text style={styles.topMatch}>🎉 Agreed on {s.top_match_name}</Text>
                 ) : (
                   <Text style={styles.noMatch}>No match reached</Text>
+                )}
+                {isOwner && (
+                  <TouchableOpacity
+                    style={styles.restartButton}
+                    onPress={() => handleRestart(s)}
+                    disabled={restartingId === s.id}
+                  >
+                    <Text style={styles.restartText}>
+                      {restartingId === s.id ? "Starting..." : `Restart · ${s.invite_code}`}
+                    </Text>
+                  </TouchableOpacity>
                 )}
               </View>
             );
@@ -264,5 +296,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fontFamily.regular,
     color: colors.textMuted,
+  },
+  restartButton: {
+    marginTop: spacing.sm,
+    alignSelf: "flex-start",
+    backgroundColor: colors.tintSurface,
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+  },
+  restartText: {
+    fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+    color: colors.primary,
   },
 });

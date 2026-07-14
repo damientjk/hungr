@@ -9,6 +9,7 @@ const CreateSessionSchema = z.object({
   name: z.string().min(1).max(100),
   cuisineFilters: z.array(z.string()).default([]),
   maxDistance: z.number().min(1000).max(50000).default(5000),
+  inviteCode: z.string().length(6).toUpperCase().optional(),
 });
 
 // ── Filters ───────────────────────────────────────────────────────────────
@@ -78,15 +79,18 @@ export async function createSession(req: AuthRequest, res: Response) {
     return;
   }
 
+  const insert: Record<string, any> = {
+    owner_id: req.userId,
+    name: parsed.data.name,
+    cuisine_filters: parsed.data.cuisineFilters,
+    max_distance: parsed.data.maxDistance,
+    status: "active",
+  };
+  if (parsed.data.inviteCode) insert.invite_code = parsed.data.inviteCode;
+
   const { data, error } = await supabase
     .from("sessions")
-    .insert({
-      owner_id: req.userId,
-      name: parsed.data.name,
-      cuisine_filters: parsed.data.cuisineFilters,
-      max_distance: parsed.data.maxDistance,
-      status: "active",
-    })
+    .insert(insert)
     .select()
     .single();
 
@@ -470,7 +474,7 @@ export async function listUserSessions(req: AuthRequest, res: Response) {
   // Fetch closed sessions the user is part of
   const { data: sessions, error } = await supabase
     .from("sessions")
-    .select("id, name, created_at, owner_id")
+    .select("id, name, created_at, owner_id, invite_code")
     .in("id", sessionIds)
     .eq("status", "closed")
     .order("created_at", { ascending: false });
@@ -516,6 +520,7 @@ export async function listUserSessions(req: AuthRequest, res: Response) {
     name: s.name,
     created_at: s.created_at,
     owner_id: s.owner_id,
+    invite_code: s.invite_code,
     participant_count: countBySession.get(s.id) ?? 0,
     top_match_name: topMatchNames.get(s.id) ?? null,
   }));

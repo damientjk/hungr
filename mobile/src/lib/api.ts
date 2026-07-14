@@ -128,6 +128,7 @@ export const api = {
       name: string;
       cuisineFilters?: string[];
       maxDistance?: number;
+      inviteCode?: string;
     }) =>
       request<{ session: Session }>("/api/sessions", {
         method: "POST",
@@ -210,6 +211,7 @@ export interface SessionSummary {
   name: string;
   created_at: string;
   owner_id: string;
+  invite_code: string;
   participant_count: number;
   top_match_name: string | null;
 }
