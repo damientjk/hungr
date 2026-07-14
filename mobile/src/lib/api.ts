@@ -203,6 +203,7 @@ export interface Session {
   price_max: number;
   halal: boolean;
   vegetarian: boolean;
+  vegan: boolean;
   created_at: string;
 }
 
@@ -223,6 +224,7 @@ export interface SessionFilterValues {
   priceMax: number;
   halal: boolean;
   vegetarian: boolean;
+  vegan: boolean;
   maxDistance: number;
   /** Optional free-text location; falls back to the device location when empty. */
   address?: string;
@@ -256,5 +258,6 @@ export const DEFAULT_FILTERS: SessionFilterValues = {
   priceMax: 2.5,
   halal: false,
   vegetarian: false,
+  vegan: false,
   maxDistance: 10000,
 };

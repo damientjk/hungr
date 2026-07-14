@@ -26,7 +26,7 @@ export default function SignupScreen() {
     if (error) {
       setError(error.message);
     } else {
-      router.replace("/(auth)/check-email", { email });
+      router.replace({ pathname: "/(auth)/check-email", params: { email } });
     }
     setLoading(false);
   }

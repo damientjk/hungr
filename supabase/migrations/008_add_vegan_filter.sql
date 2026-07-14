@@ -1,0 +1,1 @@
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS vegan boolean NOT NULL DEFAULT false;

@@ -93,6 +93,16 @@ export function SessionFilters({ value, onChange, coords }: Props) {
           thumbColor="#fff"
         />
       </View>
+      <View style={styles.toggleRow}>
+        <Text style={styles.toggleLabel}>Vegan</Text>
+        <Switch
+          value={value.vegan}
+          onValueChange={(v) => patch({ vegan: v })}
+          trackColor={{ true: colors.primary, false: "#FFDEBF" }}
+          ios_backgroundColor="#FFDEBF"
+          thumbColor="#fff"
+        />
+      </View>
 
       {/* Price range */}
       <View style={styles.sliderHeader}>
