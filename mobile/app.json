@@ -15,7 +15,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.hungr.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Hungr uses your location to find restaurants near you."
+        "NSLocationWhenInUseUsageDescription": "Hungr uses your location to find restaurants near you.",
+        "NSPhotoLibraryUsageDescription": "Hungr uses your photos to set a profile picture."
       }
     },
     "android": {
@@ -42,6 +43,12 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Hungr uses your location to find restaurants near you."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Hungr uses your photos to set a profile picture."
         }
       ],
       "expo-font"

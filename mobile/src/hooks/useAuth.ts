@@ -39,6 +39,9 @@ export function useAuth() {
   const updatePassword = (newPassword: string) =>
     supabase.auth.updateUser({ password: newPassword });
 
+  const updateProfile = (data: { nickname?: string; avatar_url?: string }) =>
+    supabase.auth.updateUser({ data });
+
   const signOut = () => supabase.auth.signOut();
 
   return {
@@ -49,6 +52,7 @@ export function useAuth() {
     signUpWithEmail,
     resetPassword,
     updatePassword,
+    updateProfile,
     signOut,
   };
 }

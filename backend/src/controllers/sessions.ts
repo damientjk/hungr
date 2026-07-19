@@ -75,6 +75,56 @@ export async function getSession(req: AuthRequest, res: Response) {
   res.json({ session });
 }
 
+export async function getSessionParticipants(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+
+  const { data: session, error: sessionError } = await supabase
+    .from("sessions")
+    .select("owner_id")
+    .eq("id", id)
+    .single();
+
+  if (sessionError || !session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  const { data: rows, error } = await supabase
+    .from("session_participants")
+    .select("user_id")
+    .eq("session_id", id);
+
+  if (error) {
+    res.status(500).json({ error: "Failed to fetch participants" });
+    return;
+  }
+
+  const isMember =
+    session.owner_id === req.userId || (rows ?? []).some((r: any) => r.user_id === req.userId);
+  if (!isMember) {
+    res.status(403).json({ error: "Not a session participant" });
+    return;
+  }
+
+  // Nickname/avatar live in auth.users' user_metadata, which isn't exposed via
+  // the regular Postgres API — look each member up through the admin API.
+  const participants = await Promise.all(
+    (rows ?? []).map(async (r: any) => {
+      const { data } = await supabase.auth.admin.getUserById(r.user_id);
+      const u = data?.user;
+      return {
+        id: r.user_id,
+        nickname: u?.user_metadata?.nickname ?? null,
+        avatarUrl: u?.user_metadata?.avatar_url ?? null,
+        email: u?.email ?? null,
+        isOwner: r.user_id === session.owner_id,
+      };
+    })
+  );
+
+  res.json({ participants });
+}
+
 export async function createSession(req: AuthRequest, res: Response) {
   const parsed = CreateSessionSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -114,16 +164,68 @@ export async function createSession(req: AuthRequest, res: Response) {
 export async function joinSession(req: AuthRequest, res: Response) {
   const { code } = req.params;
 
-  const { data: session, error: sessionError } = await supabase
+  let { data: session } = await supabase
     .from("sessions")
     .select("*")
     .eq("invite_code", code)
     .in("status", ["active", "swiping"])
     .single();
 
-  if (sessionError || !session) {
-    res.status(404).json({ error: "Session not found or no longer active" });
-    return;
+  if (!session) {
+    // No session is currently live with this code. If it belonged to a past,
+    // closed session, restart it here — no need for the original owner to be
+    // the one who does it. Whoever gets here first becomes the new owner; the
+    // unique index on invite_code (active/swiping only, see migration 009)
+    // makes concurrent restarts race-safe.
+    const { data: pastSession } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("invite_code", code)
+      .eq("status", "closed")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!pastSession) {
+      res.status(404).json({ error: "Session not found or no longer active" });
+      return;
+    }
+
+    const { data: restarted, error: restartError } = await supabase
+      .from("sessions")
+      .insert({
+        owner_id: req.userId,
+        name: pastSession.name,
+        invite_code: pastSession.invite_code,
+        cuisine_filters: pastSession.cuisine_filters,
+        max_distance: pastSession.max_distance,
+        price_min: pastSession.price_min,
+        price_max: pastSession.price_max,
+        halal: pastSession.halal,
+        vegetarian: pastSession.vegetarian,
+        vegan: pastSession.vegan,
+        status: "active",
+      })
+      .select()
+      .single();
+
+    if (restartError) {
+      // Someone else restarted this code first — join the session they just created.
+      const { data: nowActive } = await supabase
+        .from("sessions")
+        .select("*")
+        .eq("invite_code", code)
+        .in("status", ["active", "swiping"])
+        .single();
+
+      if (!nowActive) {
+        res.status(500).json({ error: "Failed to restart session" });
+        return;
+      }
+      session = nowActive;
+    } else {
+      session = restarted;
+    }
   }
 
   const { error } = await supabase.from("session_participants").upsert({

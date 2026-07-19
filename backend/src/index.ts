@@ -7,6 +7,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import restaurantRoutes from "./routes/restaurants";
 import sessionRoutes from "./routes/sessions";
 import bookmarkRoutes from "./routes/bookmarks";
+import accountRoutes from "./routes/account";
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
@@ -54,6 +55,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/restaurants", restaurantRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
+app.use("/api/account", accountRoutes);
 
 // Proxy everything else to the Expo Metro dev server (web, dev only)
 if (process.env.NODE_ENV !== "production") {

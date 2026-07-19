@@ -2,14 +2,20 @@ import { useState, useCallback } from "react";
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Image,
+  Alert,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useSession } from "@/src/lib/SessionContext";
+import { supabase } from "@/src/lib/supabase";
 import { api, SessionSummary } from "@/src/lib/api";
 import { Screen } from "@/src/components/ui/Screen";
 import { PrimaryButton } from "@/src/components/ui/PrimaryButton";
@@ -19,8 +25,8 @@ import { fontFamily } from "@/src/theme/typography";
 import { screenStyles } from "@/src/theme/screenStyles";
 
 export default function ProfileScreen() {
-  const { session, signOut } = useAuth();
-  const { setSession } = useSession();
+  const { session: authSession, signOut, updateProfile } = useAuth();
+  const { setSession: setGroupSession } = useSession();
   const router = useRouter();
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
@@ -28,6 +34,15 @@ export default function ProfileScreen() {
   const [pastSessions, setPastSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [restartingId, setRestartingId] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState("");
+  const [savingNickname, setSavingNickname] = useState(false);
+
+  const user = authSession?.user;
+  const nickname: string | undefined = user?.user_metadata?.nickname;
+  const avatarUrl: string | undefined = user?.user_metadata?.avatar_url;
 
   useFocusEffect(
     useCallback(() => {
@@ -43,31 +58,108 @@ export default function ProfileScreen() {
   async function handleRestart(s: SessionSummary) {
     setRestartingId(s.id);
     try {
-      const { session: newSession } = await api.sessions.create({
-        name: s.name,
-        inviteCode: s.invite_code,
-      });
-      setSession(newSession);
+      // Restarts the closed session under this code — whoever gets here first
+      // becomes the new owner, whether or not they led the original session.
+      const { session: newSession } = await api.sessions.join(s.invite_code);
+      setGroupSession(newSession);
       router.push("/(tabs)/sessions");
     } catch (e: any) {
-      // Code may already be in use — navigate to group tab anyway
       router.push("/(tabs)/sessions");
     } finally {
       setRestartingId(null);
     }
   }
 
-  async function handleReset() {
+  function handleReset() {
+    Alert.alert(
+      "Reset Account Data",
+      "This permanently wipes your saved likes, bookmarks, and session history. This can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Reset", style: "destructive", onPress: confirmReset },
+      ]
+    );
+  }
+
+  async function confirmReset() {
     setResetting(true);
     setResetError(null);
     setResetSuccess(false);
     try {
-      await api.restaurants.resetSwipes();
+      await api.account.resetData();
+      setPastSessions([]);
+      setGroupSession(null);
       setResetSuccess(true);
     } catch (e: any) {
       setResetError(e.message);
     } finally {
       setResetting(false);
+    }
+  }
+
+  async function handleAvatarPress() {
+    if (uploadingAvatar || !user) return;
+    setAvatarError(null);
+
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      setAvatarError("Photo library permission is required to set a profile picture.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    setUploadingAvatar(true);
+    try {
+      const asset = result.assets[0];
+      const ext = asset.uri.split(".").pop()?.split("?")[0]?.toLowerCase() || "jpg";
+      const path = `${user.id}/avatar.${ext}`;
+      const response = await fetch(asset.uri);
+      const arrayBuffer = await response.arrayBuffer();
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, arrayBuffer, {
+          contentType: asset.mimeType ?? "image/jpeg",
+          upsert: true,
+        });
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      // Cache-bust so the new image shows immediately at the same URL.
+      const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
+
+      const { error: updateError } = await updateProfile({ avatar_url: publicUrl });
+      if (updateError) throw updateError;
+    } catch (e: any) {
+      setAvatarError(e.message ?? "Failed to update profile picture");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  function startEditingNickname() {
+    setNicknameDraft(nickname ?? "");
+    setEditingNickname(true);
+  }
+
+  async function saveNickname() {
+    const trimmed = nicknameDraft.trim();
+    setSavingNickname(true);
+    try {
+      const { error } = await updateProfile({ nickname: trimmed });
+      if (error) throw error;
+      setEditingNickname(false);
+    } catch {
+      // Leave the editor open so the user can retry.
+    } finally {
+      setSavingNickname(false);
     }
   }
 
@@ -77,16 +169,64 @@ export default function ProfileScreen() {
         <Text style={screenStyles.header}>Profile</Text>
 
         <View style={styles.card}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {session?.user.email?.charAt(0).toUpperCase() ?? "?"}
-            </Text>
-          </View>
-          <Text style={styles.email}>{session?.user.email}</Text>
+          <TouchableOpacity
+            style={styles.avatar}
+            onPress={handleAvatarPress}
+            disabled={uploadingAvatar}
+            activeOpacity={0.8}
+          >
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>
+                {(nickname || user?.email)?.charAt(0).toUpperCase() ?? "?"}
+              </Text>
+            )}
+            <View style={styles.avatarBadge}>
+              {uploadingAvatar ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="camera" size={14} color="#fff" />
+              )}
+            </View>
+          </TouchableOpacity>
+
+          {editingNickname ? (
+            <View style={styles.nicknameEditRow}>
+              <TextInput
+                style={styles.nicknameInput}
+                value={nicknameDraft}
+                onChangeText={setNicknameDraft}
+                placeholder="Nickname"
+                placeholderTextColor={colors.textLight}
+                autoFocus
+                maxLength={30}
+                editable={!savingNickname}
+              />
+              <TouchableOpacity onPress={saveNickname} disabled={savingNickname} style={styles.nicknameSaveBtn}>
+                {savingNickname ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="checkmark" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setEditingNickname(false)} disabled={savingNickname}>
+                <Ionicons name="close" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.nicknameRow} onPress={startEditingNickname}>
+              <Text style={styles.nickname}>{nickname || "Add a nickname"}</Text>
+              <Ionicons name="pencil" size={14} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          <Text style={styles.email}>{user?.email}</Text>
+          {avatarError && <Text style={styles.errorText}>{avatarError}</Text>}
         </View>
 
         <PrimaryButton
-          title={resetting ? "Resetting..." : "Reset Likes"}
+          title={resetting ? "Resetting..." : "Reset Account Data"}
           onPress={handleReset}
           loading={resetting}
           disabled={resetting}
@@ -95,7 +235,7 @@ export default function ProfileScreen() {
         />
 
         {resetSuccess && (
-          <Text style={styles.successText}>Likes reset — go discover again!</Text>
+          <Text style={styles.successText}>Account data reset — starting fresh!</Text>
         )}
         {resetError && <Text style={styles.errorText}>{resetError}</Text>}
 
@@ -112,7 +252,7 @@ export default function ProfileScreen() {
           <Text style={styles.emptyText}>No completed sessions yet.</Text>
         ) : (
           pastSessions.map((s) => {
-            const isOwner = s.owner_id === session?.user.id;
+            const isOwner = s.owner_id === user?.id;
             const date = new Date(s.created_at).toLocaleDateString(undefined, {
               day: "numeric",
               month: "short",
@@ -134,17 +274,15 @@ export default function ProfileScreen() {
                 ) : (
                   <Text style={styles.noMatch}>No match reached</Text>
                 )}
-                {isOwner && (
-                  <TouchableOpacity
-                    style={styles.restartButton}
-                    onPress={() => handleRestart(s)}
-                    disabled={restartingId === s.id}
-                  >
-                    <Text style={styles.restartText}>
-                      {restartingId === s.id ? "Starting..." : `Restart · ${s.invite_code}`}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={styles.restartButton}
+                  onPress={() => handleRestart(s)}
+                  disabled={restartingId === s.id}
+                >
+                  <Text style={styles.restartText}>
+                    {restartingId === s.id ? "Starting..." : `Restart · ${s.invite_code}`}
+                  </Text>
+                </TouchableOpacity>
               </View>
             );
           })
@@ -181,11 +319,60 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderWidth: 3,
     borderColor: colors.tintSurface,
+    overflow: "visible",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 44,
+  },
+  avatarBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.text,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.surface,
   },
   avatarText: {
     fontSize: 36,
     fontFamily: fontFamily.extraBold,
     color: "#fff",
+  },
+  nicknameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
+  },
+  nickname: {
+    fontSize: 18,
+    fontFamily: fontFamily.bold,
+    color: colors.text,
+  },
+  nicknameEditRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+    width: "100%",
+  },
+  nicknameInput: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: fontFamily.regular,
+    color: colors.text,
+    borderBottomWidth: 1.5,
+    borderBottomColor: colors.primary,
+    paddingVertical: 4,
+  },
+  nicknameSaveBtn: {
+    padding: 2,
   },
   email: {
     fontSize: 16,
