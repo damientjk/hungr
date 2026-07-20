@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import {
   getSession,
+  getSessionParticipants,
   createSession,
   joinSession,
   startSwiping,
@@ -20,6 +21,7 @@ router.get("/", listUserSessions);
 router.post("/", createSession);
 router.post("/join/:code", joinSession);
 router.get("/:id", getSession);
+router.get("/:id/participants", getSessionParticipants);
 router.patch("/:id/start", startSwiping);
 router.get("/:id/restaurants", getSessionRestaurants);
 router.post("/:id/restaurants", refreshSessionRestaurants);

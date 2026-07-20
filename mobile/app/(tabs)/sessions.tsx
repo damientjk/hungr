@@ -11,9 +11,10 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Image,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { api, Restaurant, SessionFilterValues, DEFAULT_FILTERS } from "@/src/lib/api";
+import { api, Restaurant, SessionFilterValues, DEFAULT_FILTERS, SessionParticipant } from "@/src/lib/api";
 import { SessionFilters } from "@/src/components/SessionFilters";
 import { useSession } from "@/src/lib/SessionContext";
 import { useLocation } from "@/src/hooks/useLocation";
@@ -47,6 +48,15 @@ export default function SessionsScreen() {
     participantCount: number;
   } | null>(null);
   const [matchesLoading, setMatchesLoading] = useState(false);
+  const [participants, setParticipants] = useState<SessionParticipant[]>([]);
+
+  const fetchParticipants = useCallback(() => {
+    if (!session) return;
+    api.sessions
+      .participants(session.id)
+      .then(({ participants }) => setParticipants(participants))
+      .catch(() => {});
+  }, [session?.id]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -105,7 +115,9 @@ export default function SessionsScreen() {
     }, [session?.id, session?.status])
   );
 
-  // Poll every 3 s via backend so RLS never blocks the status check
+  // Poll every 3 s via backend so RLS never blocks the status check. Also
+  // covers participants — new joiners don't emit a realtime event (only
+  // `sessions`, not `session_participants`, is in the realtime publication).
   useEffect(() => {
     if (!session || (session.status !== "active" && session.status !== "swiping")) return;
     const interval = setInterval(async () => {
@@ -118,6 +130,7 @@ export default function SessionsScreen() {
           router.push("/(tabs)/swipe");
         }
       } catch {}
+      fetchParticipants();
     }, 3000);
     return () => clearInterval(interval);
   }, [session?.id, session?.status]);
@@ -134,6 +147,17 @@ export default function SessionsScreen() {
       setMatchesLoading(false);
     }
   }
+
+  useEffect(() => {
+    fetchParticipants();
+  }, [session?.id]);
+
+  // Catch newly joined members when returning to this tab.
+  useFocusEffect(
+    useCallback(() => {
+      fetchParticipants();
+    }, [fetchParticipants])
+  );
 
   async function handleCreate() {
     setCreateError(null);
@@ -238,6 +262,42 @@ export default function SessionsScreen() {
             </View>
           )}
         </View>
+
+        {/* Who's in the session */}
+        {participants.length > 0 && (
+          <View style={styles.participantsSection}>
+            <Text style={styles.participantsTitle}>
+              In this session · {participants.length}
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.participantsRow}
+            >
+              {participants.map((p) => {
+                const label = p.nickname || p.email?.split("@")[0] || "Guest";
+                return (
+                  <View key={p.id} style={styles.participantChip}>
+                    <View style={styles.participantAvatar}>
+                      {p.avatarUrl ? (
+                        <Image source={{ uri: p.avatarUrl }} style={styles.participantAvatarImage} />
+                      ) : (
+                        <Text style={styles.participantAvatarText}>
+                          {label.charAt(0).toUpperCase()}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.participantName} numberOfLines={1}>
+                      {label}
+                      {p.id === myUserId ? " (You)" : ""}
+                    </Text>
+                    {p.isOwner && <Text style={styles.participantOwnerTag}>Owner</Text>}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Owner filters + start */}
         {isOwner && !isSwiping && (
@@ -496,6 +556,56 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontFamily: fontFamily.semiBold,
     fontSize: 14,
+  },
+  participantsSection: {
+    marginBottom: spacing.md,
+  },
+  participantsTitle: {
+    fontSize: 13,
+    fontFamily: fontFamily.semiBold,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
+  participantsRow: {
+    gap: spacing.md,
+    paddingRight: spacing.md,
+  },
+  participantChip: {
+    alignItems: "center",
+    width: 64,
+  },
+  participantAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+    borderWidth: 2,
+    borderColor: colors.tintSurface,
+    overflow: "hidden",
+  },
+  participantAvatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  participantAvatarText: {
+    fontSize: 18,
+    fontFamily: fontFamily.extraBold,
+    color: "#fff",
+  },
+  participantName: {
+    fontSize: 11,
+    fontFamily: fontFamily.regular,
+    color: colors.textMuted,
+    textAlign: "center",
+  },
+  participantOwnerTag: {
+    fontSize: 9,
+    fontFamily: fontFamily.bold,
+    color: colors.primary,
+    marginTop: 1,
   },
   startButton: {
     backgroundColor: colors.primary,

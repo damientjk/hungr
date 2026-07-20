@@ -76,6 +76,10 @@ export default function TabLayout() {
             ),
           }}
         />
+        <Tabs.Screen name="discover" options={{ title: "Discover",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="compass" size={size + 2} color={color} />
+            ), }} />
         <Tabs.Screen
           name="profile"
           options={{
@@ -85,10 +89,6 @@ export default function TabLayout() {
             ),
           }}
         />
-        <Tabs.Screen name="discover" options={{ title: "Discover",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="compass" size={size + 2} color={color} />
-            ), }} />
       </Tabs>
     </SessionProvider>
   );

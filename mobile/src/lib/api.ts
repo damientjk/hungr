@@ -124,10 +124,13 @@ export const api = {
   sessions: {
     get: (id: string) =>
       request<{ session: Session }>(`/api/sessions/${id}`),
+    participants: (id: string) =>
+      request<{ participants: SessionParticipant[] }>(`/api/sessions/${id}/participants`),
     create: (payload: {
       name: string;
       cuisineFilters?: string[];
       maxDistance?: number;
+      inviteCode?: string;
     }) =>
       request<{ session: Session }>("/api/sessions", {
         method: "POST",
@@ -175,6 +178,9 @@ export const api = {
     remove: (restaurantId: string) =>
       request(`/api/bookmarks/${restaurantId}`, { method: "DELETE" }),
   },
+  account: {
+    resetData: () => request("/api/account/data", { method: "DELETE" }),
+  },
 };
 
 export type SwipeDirection = "like" | "dislike";
@@ -206,11 +212,20 @@ export interface Session {
   created_at: string;
 }
 
+export interface SessionParticipant {
+  id: string;
+  nickname: string | null;
+  avatarUrl: string | null;
+  email: string | null;
+  isOwner: boolean;
+}
+
 export interface SessionSummary {
   id: string;
   name: string;
   created_at: string;
   owner_id: string;
+  invite_code: string;
   participant_count: number;
   top_match_name: string | null;
 }
