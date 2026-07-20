@@ -417,6 +417,11 @@ export default function SwipeScreen() {
       router.push("/(tabs)/sessions");
     }
 
+    function openMaps(restaurant: Restaurant) {
+      const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
+      Linking.openURL(`https://maps.google.com/?q=${query}`);
+    }
+
     if (matches.length > 0) {
       const pick = matches[0];
       return (
@@ -428,6 +433,7 @@ export default function SwipeScreen() {
             <View style={styles.resultCardWrap}>
               <RestaurantCard restaurant={pick} variant="stack" cardHeight={260} />
             </View>
+            <PrimaryButton title="📍 Open in Maps" onPress={() => openMaps(pick)} variant="secondary" style={{ marginBottom: spacing.sm }} />
             <PrimaryButton title="End Session" onPress={endAndLeave} />
           </ScrollView>
         </Screen>
@@ -449,6 +455,7 @@ export default function SwipeScreen() {
                   ❤️ {topMatch.likeCount} / {participantCount} members liked this
                 </Text>
               </View>
+              <PrimaryButton title="📍 Open in Maps" onPress={() => openMaps(topMatch)} variant="secondary" style={{ marginTop: spacing.sm }} />
             </View>
           ) : (
             <Text style={styles.noLikesText}>Nobody liked any restaurants yet.</Text>

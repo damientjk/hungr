@@ -1,4 +1,4 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, Image, TouchableOpacity, Linking, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Restaurant } from "@/src/lib/api";
 import { colors } from "@/src/theme/colors";
@@ -17,9 +17,14 @@ interface Props {
   subtitle?: string;
 }
 
+function openMaps(restaurant: Restaurant) {
+  const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
+  Linking.openURL(`https://maps.google.com/?q=${query}`);
+}
+
 export function RestaurantListRow({ restaurant, rightAction, subtitle }: Props) {
   return (
-    <View style={styles.item}>
+    <TouchableOpacity style={styles.item} onPress={() => openMaps(restaurant)} activeOpacity={0.75}>
       {restaurant.photo_url ? (
         <Image source={{ uri: restaurant.photo_url }} style={styles.thumbnail} />
       ) : (
@@ -54,7 +59,7 @@ export function RestaurantListRow({ restaurant, rightAction, subtitle }: Props) 
           />
         </TouchableOpacity>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 

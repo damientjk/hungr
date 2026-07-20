@@ -12,6 +12,7 @@ import {
   Alert,
   Linking,
   Image,
+  Platform,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { api, Restaurant, SessionFilterValues, DEFAULT_FILTERS, SessionParticipant } from "@/src/lib/api";
@@ -303,15 +304,25 @@ export default function SessionsScreen() {
         {isOwner && !isSwiping && (
           <>
             <SessionFilters value={filters} onChange={setFilters} coords={coords} />
-            {startError && <Text style={styles.error}>{startError}</Text>}
+            {startError && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorBoxIcon}>⚠️</Text>
+                <Text style={styles.errorBoxText}>{startError}</Text>
+              </View>
+            )}
             <TouchableOpacity
               style={[styles.startButton, loading && styles.buttonDisabled]}
               onPress={handleStartSwiping}
               disabled={loading}
             >
-              <Text style={styles.startButtonText}>
-                {loading ? "Starting…" : "Start Swiping"}
-              </Text>
+              {loading ? (
+                <View style={styles.startButtonInner}>
+                  <ActivityIndicator color="#fff" size="small" style={{ marginRight: 10 }} />
+                  <Text style={styles.startButtonText}>Finding restaurants…</Text>
+                </View>
+              ) : (
+                <Text style={styles.startButtonText}>Start Swiping</Text>
+              )}
             </TouchableOpacity>
           </>
         )}
@@ -614,10 +625,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.md,
   },
+  startButtonInner: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   startButtonText: {
     color: "#fff",
     fontFamily: fontFamily.extraBold,
     fontSize: 18,
+  },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#fff1f0",
+    borderWidth: 1,
+    borderColor: "#ffccc7",
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  errorBoxIcon: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  errorBoxText: {
+    flex: 1,
+    color: colors.destructive,
+    fontSize: 14,
+    fontFamily: fontFamily.semiBold,
+    lineHeight: 20,
   },
   waitingBox: {
     backgroundColor: colors.imagePlaceholder,
