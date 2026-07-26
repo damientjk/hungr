@@ -28,7 +28,7 @@ export default function ResetPasswordScreen() {
     if (error) {
       setError(error.message);
     } else {
-      router.replace("/(tabs)/swipe");
+      router.replace("/(tabs)/sessions");
     }
     setLoading(false);
   }
