@@ -74,7 +74,7 @@ export function SessionFilters({ value, onChange, coords }: Props) {
       {/* Dietary */}
       <Text style={styles.label}>Dietary</Text>
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Halal only</Text>
+        <Text style={styles.toggleLabel}>Halal</Text>
         <Switch
           value={value.halal}
           onValueChange={(v) => patch({ halal: v })}

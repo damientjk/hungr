@@ -23,7 +23,7 @@ export default function DiscoverFiltersScreen() {
       <Text style={screenStyles.header}>Filters</Text>
 
       <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Halal only</Text>
+        <Text style={styles.toggleLabel}>Halal</Text>
         <Switch
           value={draft.halal}
           onValueChange={(v) => setDraft((d) => ({ ...d, halal: v }))}
