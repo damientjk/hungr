@@ -46,7 +46,7 @@ export default function DiscoverScreen() {
     }
   }, [coords]);
 
-  const sections = useMemo(() => {
+  const sections = useMemo((): { title: string; data: Restaurant[] }[] => {
     const sorted = [...restaurants].sort((a, b) => {
       if (sort === "rating") return b.rating - a.rating;
       if (sort === "price") return a.price_level - b.price_level;
