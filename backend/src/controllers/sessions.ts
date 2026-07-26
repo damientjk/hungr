@@ -5,7 +5,12 @@ import { AuthRequest } from "../middleware/auth";
 import { fetchAllNearbyRestaurants } from "../lib/places";
 import { refreshStalePhotos } from "../lib/photoFreshness";
 import { geocodeAddress } from "../lib/geocode";
-import { handleOwnerDeparture, touchParticipant, withDisconnectedFlag } from "../lib/presence";
+import {
+  handleOwnerDeparture,
+  touchParticipant,
+  withDisconnectedFlag,
+  AUTO_REJOIN_STALE_AFTER_MS,
+} from "../lib/presence";
 import { effectiveCuisineFilters, buildSearchTags } from "../lib/dietaryFilters";
 
 const CreateSessionSchema = z.object({
@@ -122,7 +127,7 @@ export async function getSessionParticipants(req: AuthRequest, res: Response) {
 export async function getCurrentSession(req: AuthRequest, res: Response) {
   const { data: rows } = await supabase
     .from("session_participants")
-    .select("session_id")
+    .select("session_id, last_active_at")
     .eq("user_id", req.userId);
 
   const sessionIds = (rows ?? []).map((r: any) => r.session_id);
@@ -140,11 +145,22 @@ export async function getCurrentSession(req: AuthRequest, res: Response) {
     .limit(1)
     .single();
 
-  if (session && req.userId) {
-    await touchParticipant(session.id, req.userId);
+  if (!session) {
+    res.json({ session: null });
+    return;
   }
 
-  res.json({ session: session ?? null });
+  const participantRow = (rows ?? []).find((r: any) => r.session_id === session.id);
+  const inactiveMs = participantRow
+    ? Date.now() - new Date(participantRow.last_active_at).getTime()
+    : Infinity;
+  if (inactiveMs > AUTO_REJOIN_STALE_AFTER_MS) {
+    res.json({ session: null });
+    return;
+  }
+
+  if (req.userId) await touchParticipant(session.id, req.userId);
+  res.json({ session });
 }
 
 /** Self-initiated leave. If the leaver is the owner, ownership is handed off (or the session closed) first. */

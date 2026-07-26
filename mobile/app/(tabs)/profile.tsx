@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Image,
   Alert,
+  Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
@@ -74,6 +75,7 @@ export default function ProfileScreen() {
   const [editingNickname, setEditingNickname] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState("");
   const [savingNickname, setSavingNickname] = useState(false);
+  const [nicknameError, setNicknameError] = useState<string | null>(null);
 
   const user = authSession?.user;
   const nickname: string | undefined = user?.user_metadata?.nickname;
@@ -106,14 +108,15 @@ export default function ProfileScreen() {
   }
 
   function handleReset() {
-    Alert.alert(
-      "Reset Account Data",
-      "This permanently wipes your saved likes, bookmarks, and session history. This can't be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Reset", style: "destructive", onPress: confirmReset },
-      ]
-    );
+    const message = "This permanently wipes your saved likes, bookmarks, and session history. This can't be undone.";
+    if (Platform.OS === "web") {
+      if (window.confirm(message)) confirmReset();
+      return;
+    }
+    Alert.alert("Reset Account Data", message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Reset", style: "destructive", onPress: confirmReset },
+    ]);
   }
 
   async function confirmReset() {
@@ -181,17 +184,20 @@ export default function ProfileScreen() {
 
   function startEditingNickname() {
     setNicknameDraft(nickname ?? "");
+    setNicknameError(null);
     setEditingNickname(true);
   }
 
   async function saveNickname() {
     const trimmed = nicknameDraft.trim();
     setSavingNickname(true);
+    setNicknameError(null);
     try {
       const { error } = await updateProfile({ nickname: trimmed });
       if (error) throw error;
       setEditingNickname(false);
-    } catch {
+    } catch (e: any) {
+      setNicknameError(e?.message ?? "Failed to save nickname");
       // Leave the editor open so the user can retry.
     } finally {
       setSavingNickname(false);
@@ -249,7 +255,9 @@ export default function ProfileScreen() {
                 <Ionicons name="close" size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
-          ) : (
+          ) : null}
+          {nicknameError && <Text style={styles.errorText}>{nicknameError}</Text>}
+          {!editingNickname && (
             <TouchableOpacity style={styles.nicknameRow} onPress={startEditingNickname}>
               <Text style={styles.nickname}>{nickname || "Add a nickname"}</Text>
               <Ionicons name="pencil" size={14} color={colors.textMuted} />

@@ -6,6 +6,9 @@ const DISCONNECTED_AFTER_MS = 20 * 1000;
 /** How long the current host must be inactive before ownership is up for transfer. */
 const HOST_TRANSFER_AFTER_MS = 60 * 1000;
 
+/** Beyond this, reopening the app no longer auto-rejoins the user to the session. */
+export const AUTO_REJOIN_STALE_AFTER_MS = 10 * 60 * 1000;
+
 /** Bump a participant's presence. No-ops if they're not (or no longer) a participant. */
 export async function touchParticipant(sessionId: string, userId: string): Promise<void> {
   await supabase
