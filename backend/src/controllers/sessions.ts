@@ -715,19 +715,18 @@ export async function getSessionMatches(req: AuthRequest, res: Response) {
         counts.get(restaurant_id)!.add(user_id);
       }
 
-      const topId = [...counts.entries()]
-        .sort((a, b) => b[1].size - a[1].size)[0]?.[0];
+      const sorted = [...counts.entries()].sort((a, b) => b[1].size - a[1].size);
+      const topCount = sorted[0]?.[1].size ?? 0;
+      const tiedIds = sorted.filter(([, s]) => s.size === topCount).map(([id]) => id);
 
-      if (topId) {
-        const { data: restaurant } = await supabase
-          .from("restaurants")
-          .select("id, name, cuisines, rating, price_level, photo_url, address")
-          .eq("id", topId)
-          .single();
+      const { data: tied } = await supabase
+        .from("restaurants")
+        .select("id, name, cuisines, rating, price_level, photo_url, address")
+        .in("id", tiedIds);
 
-        if (restaurant) {
-          topMatch = { ...restaurant, likeCount: counts.get(topId)!.size };
-        }
+      if (tied && tied.length > 0) {
+        const best = tied.sort((a, b) => b.rating - a.rating)[0];
+        topMatch = { ...best, likeCount: topCount };
       }
     }
   }
