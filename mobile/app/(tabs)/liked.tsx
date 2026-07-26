@@ -19,13 +19,13 @@ import { fontFamily } from "@/src/theme/typography";
 import { spacing } from "@/src/theme/spacing";
 import { screenStyles } from "@/src/theme/screenStyles";
 
-type View = "all" | string; // "all" or a folder id
+type ActiveView = "all" | string; // "all" or a folder id
 
 export default function BookmarksScreen() {
   const [bookmarks, setBookmarks] = useState<Restaurant[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<View>("all");
+  const [activeView, setActiveView] = useState<ActiveView>("all");
 
   // Folder creation modal
   const [showCreate, setShowCreate] = useState(false);
