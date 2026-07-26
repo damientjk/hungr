@@ -24,6 +24,37 @@ import { spacing } from "@/src/theme/spacing";
 import { fontFamily } from "@/src/theme/typography";
 import { screenStyles } from "@/src/theme/screenStyles";
 
+const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
+const DEFAULT_PRICE_MIN = 1;
+const DEFAULT_PRICE_MAX = 4;
+const DEFAULT_DISTANCE = 10000;
+
+function formatFilterSummary(s: SessionSummary): string | null {
+  const parts: string[] = [];
+
+  if (s.cuisine_filters?.length) {
+    parts.push(s.cuisine_filters.map((c) => c.charAt(0).toUpperCase() + c.slice(1)).join(", "));
+  }
+
+  const priceMin = s.price_min ?? DEFAULT_PRICE_MIN;
+  const priceMax = s.price_max ?? DEFAULT_PRICE_MAX;
+  const distance = s.max_distance ?? DEFAULT_DISTANCE;
+
+  if (priceMin !== DEFAULT_PRICE_MIN || priceMax !== DEFAULT_PRICE_MAX) {
+    parts.push(priceMin === priceMax ? PRICE_LABELS[priceMin] : `${PRICE_LABELS[priceMin]}–${PRICE_LABELS[Math.round(priceMax)]}`);
+  }
+
+  if (distance !== DEFAULT_DISTANCE) {
+    parts.push(`${Math.round(distance / 1000)}km`);
+  }
+
+  if (s.halal) parts.push("Halal");
+  if (s.vegetarian) parts.push("Vegetarian");
+  if (s.vegan) parts.push("Vegan");
+
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 export default function ProfileScreen() {
   const { session: authSession, signOut, updateProfile } = useAuth();
   const { setSession: setGroupSession } = useSession();
@@ -280,8 +311,9 @@ export default function ProfileScreen() {
                   disabled={restartingId === s.id}
                 >
                   <Text style={styles.restartText}>
-                    {restartingId === s.id ? "Starting..." : `Restart · ${s.invite_code}`}
+                    {restartingId === s.id ? "Starting..." : `↺ Restart · ${s.invite_code}`}
                   </Text>
+                  {(() => { const summary = formatFilterSummary(s); return summary ? <Text style={styles.restartFilters}>{summary}</Text> : null; })()}
                 </TouchableOpacity>
               </View>
             );
@@ -488,13 +520,19 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     alignSelf: "flex-start",
     backgroundColor: colors.tintSurface,
-    borderRadius: 20,
+    borderRadius: 12,
     paddingHorizontal: spacing.md,
-    paddingVertical: 5,
+    paddingVertical: spacing.sm,
   },
   restartText: {
     fontSize: 12,
     fontFamily: fontFamily.semiBold,
     color: colors.primary,
+  },
+  restartFilters: {
+    fontSize: 11,
+    fontFamily: fontFamily.regular,
+    color: colors.textMuted,
+    marginTop: 2,
   },
 });

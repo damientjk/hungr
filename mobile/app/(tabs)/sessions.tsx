@@ -41,7 +41,19 @@ export default function SessionsScreen() {
   const prevSessionIdRef = useRef<string | null>(null);
   if (session?.id !== prevSessionIdRef.current) {
     prevSessionIdRef.current = session?.id ?? null;
-    if (filters !== DEFAULT_FILTERS) setFilters(DEFAULT_FILTERS);
+    if (session) {
+      setFilters({
+        cuisineFilters: session.cuisine_filters ?? [],
+        maxDistance: session.max_distance ?? DEFAULT_FILTERS.maxDistance,
+        priceMin: session.price_min ?? DEFAULT_FILTERS.priceMin,
+        priceMax: session.price_max ?? DEFAULT_FILTERS.priceMax,
+        halal: session.halal ?? false,
+        vegetarian: session.vegetarian ?? false,
+        vegan: session.vegan ?? false,
+      });
+    } else {
+      setFilters(DEFAULT_FILTERS);
+    }
   }
   const [matchResult, setMatchResult] = useState<{
     matches: Restaurant[];

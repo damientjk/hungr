@@ -226,6 +226,13 @@ export interface SessionSummary {
   created_at: string;
   owner_id: string;
   invite_code: string;
+  cuisine_filters: string[];
+  max_distance: number;
+  price_min: number;
+  price_max: number;
+  halal: boolean;
+  vegetarian: boolean;
+  vegan: boolean;
   participant_count: number;
   top_match_name: string | null;
 }
@@ -268,7 +275,7 @@ export const CUISINE_OPTIONS = [
 export const DEFAULT_FILTERS: SessionFilterValues = {
   cuisineFilters: [],
   priceMin: 1,
-  priceMax: 2.5,
+  priceMax: 4,
   halal: false,
   vegetarian: false,
   vegan: false,

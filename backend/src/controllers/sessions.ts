@@ -583,7 +583,7 @@ export async function listUserSessions(req: AuthRequest, res: Response) {
   // Fetch closed sessions the user is part of
   const { data: sessions, error } = await supabase
     .from("sessions")
-    .select("id, name, created_at, owner_id, invite_code")
+    .select("id, name, created_at, owner_id, invite_code, cuisine_filters, max_distance, price_min, price_max, halal, vegetarian, vegan")
     .in("id", sessionIds)
     .eq("status", "closed")
     .order("created_at", { ascending: false });
@@ -630,6 +630,13 @@ export async function listUserSessions(req: AuthRequest, res: Response) {
     created_at: s.created_at,
     owner_id: s.owner_id,
     invite_code: s.invite_code,
+    cuisine_filters: s.cuisine_filters ?? [],
+    max_distance: s.max_distance ?? 10000,
+    price_min: s.price_min ?? 1,
+    price_max: s.price_max ?? 4,
+    halal: s.halal ?? false,
+    vegetarian: s.vegetarian ?? false,
+    vegan: s.vegan ?? false,
     participant_count: countBySession.get(s.id) ?? 0,
     top_match_name: topMatchNames.get(s.id) ?? null,
   }));
