@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { fetchAllNearbyRestaurants } from "../lib/places";
 import { refreshStalePhotos } from "../lib/photoFreshness";
 import { effectiveCuisineFilters, buildSearchTags } from "../lib/dietaryFilters";
+import { upsertRestaurants } from "../lib/restaurantUpsert";
 import { autocompletePlaces } from "../lib/geocode";
 import { AuthRequest } from "../middleware/auth";
 
@@ -72,9 +73,7 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
       const allPlaces = await fetchAllNearbyRestaurants(latitude, longitude, radius, buildSearchTags(dietary));
       console.log(`Fetched ${allPlaces.length} restaurants from Places API`);
       if (allPlaces.length > 0) {
-        const { error: upsertError } = await supabase
-          .from("restaurants")
-          .upsert(allPlaces, { onConflict: "place_id", ignoreDuplicates: false });
+        const { error: upsertError } = await upsertRestaurants(allPlaces);
         if (upsertError) console.error("Upsert error:", upsertError);
       }
     } catch (e) {

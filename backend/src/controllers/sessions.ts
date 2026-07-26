@@ -12,6 +12,7 @@ import {
   AUTO_REJOIN_STALE_AFTER_MS,
 } from "../lib/presence";
 import { effectiveCuisineFilters, buildSearchTags } from "../lib/dietaryFilters";
+import { upsertRestaurants } from "../lib/restaurantUpsert";
 
 const CreateSessionSchema = z.object({
   name: z.string().min(1).max(100),
@@ -388,9 +389,7 @@ async function seedSessionRestaurants(
       const tags = buildSearchTags(filters);
       const places = await fetchAllNearbyRestaurants(latitude, longitude, radius, tags);
       if (places.length > 0) {
-        await supabase
-          .from("restaurants")
-          .upsert(places, { onConflict: "place_id", ignoreDuplicates: false });
+        await upsertRestaurants(places);
       }
     } catch (e) {
       console.error("Places API fetch failed:", e);
