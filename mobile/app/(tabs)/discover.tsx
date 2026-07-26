@@ -1,16 +1,35 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
-  FlatList,
+  SectionList,
+  TouchableOpacity,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import { api, Restaurant } from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
 import { Screen } from "@/src/components/ui/Screen";
 import { RestaurantListRow } from "@/src/components/RestaurantListRow";
 import { colors } from "@/src/theme/colors";
+import { fontFamily } from "@/src/theme/typography";
+import { spacing } from "@/src/theme/spacing";
 import { screenStyles } from "@/src/theme/screenStyles";
+
+type SortKey = "distance" | "rating" | "price";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "distance", label: "Nearest" },
+  { key: "rating", label: "Top Rated" },
+  { key: "price", label: "Price" },
+];
+
+const DISTANCE_BANDS = [
+  { label: "Under 500m", max: 500 },
+  { label: "Under 1km", max: 1000 },
+  { label: "Under 3km", max: 3000 },
+  { label: "Further away", max: Infinity },
+];
 
 export default function DiscoverScreen() {
   const { coords, loading: locationLoading, error: locationError } = useLocation();
@@ -18,6 +37,7 @@ export default function DiscoverScreen() {
   const [loading, setLoading] = useState(false);
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
   const [toggling, setToggling] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState<SortKey>("distance");
 
   useEffect(() => {
     if (coords) {
@@ -25,6 +45,34 @@ export default function DiscoverScreen() {
       fetchBookmarks();
     }
   }, [coords]);
+
+  const sections = useMemo(() => {
+    const sorted = [...restaurants].sort((a, b) => {
+      if (sort === "rating") return b.rating - a.rating;
+      if (sort === "price") return a.price_level - b.price_level;
+      return a.distance_meters - b.distance_meters;
+    });
+
+    if (sort !== "distance") {
+      return [{ title: null, data: sorted }];
+    }
+
+    // Group into distance bands
+    const result: { title: string; data: Restaurant[] }[] = [];
+    let assigned = new Set<string>();
+
+    for (const band of DISTANCE_BANDS) {
+      const items = sorted.filter(
+        (r) => r.distance_meters <= band.max && !assigned.has(r.id)
+      );
+      if (items.length > 0) {
+        items.forEach((r) => assigned.add(r.id));
+        result.push({ title: band.label, data: items });
+      }
+    }
+
+    return result;
+  }, [restaurants, sort]);
 
   async function fetchRestaurants() {
     if (!coords) return;
@@ -104,11 +152,34 @@ export default function DiscoverScreen() {
 
   return (
     <Screen>
-      <Text style={screenStyles.header}>Discover</Text>
-      <FlatList
-        data={restaurants}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={screenStyles.list}
+        contentContainerStyle={styles.list}
+        stickySectionHeadersEnabled={false}
+        ListHeaderComponent={
+          <View>
+            <Text style={screenStyles.header}>Discover</Text>
+            <View style={styles.sortRow}>
+              {SORT_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.sortBtn, sort === opt.key && styles.sortBtnActive]}
+                  onPress={() => setSort(opt.key)}
+                >
+                  <Text style={[styles.sortText, sort === opt.key && styles.sortTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        }
+        renderSectionHeader={({ section }) =>
+          section.title ? (
+            <Text style={styles.sectionHeader}>{section.title}</Text>
+          ) : null
+        }
         renderItem={({ item }) => {
           const isBookmarked = bookmarked.has(item.id);
           const distance =
@@ -137,3 +208,44 @@ export default function DiscoverScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  list: {
+    padding: spacing.md,
+    paddingBottom: spacing.xl,
+  },
+  sortRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  sortBtn: {
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sortBtnActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  sortText: {
+    fontSize: 13,
+    fontFamily: fontFamily.semiBold,
+    color: colors.textLight,
+  },
+  sortTextActive: {
+    color: "#fff",
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontFamily: fontFamily.bold,
+    color: colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+  },
+});
