@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { api, Restaurant } from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
 import { useDiscoverFilters } from "@/src/lib/DiscoverFiltersContext";
@@ -23,7 +24,7 @@ type SortKey = "distance" | "rating" | "price";
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "distance", label: "Nearest" },
   { key: "rating", label: "Top Rated" },
-  { key: "price", label: "Price - Cheapest first" },
+  { key: "price", label: "Price: Low to High" },
 ];
 
 const DISTANCE_BANDS = [
@@ -169,6 +170,12 @@ export default function DiscoverScreen() {
         ListHeaderComponent={
           <View>
             <Text style={screenStyles.header}>Discover</Text>
+            <TouchableOpacity style={styles.filterBtn} onPress={() => router.push("/discover-filters")}>
+              <Ionicons name="options-outline" size={17} color="#fff" />
+              <Text style={styles.filterBtnText}>
+                Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+              </Text>
+            </TouchableOpacity>
             <Text style={styles.sortByLabel}>Sort by:</Text>
             <View style={styles.sortRow}>
               {SORT_OPTIONS.map((opt) => (
@@ -183,14 +190,6 @@ export default function DiscoverScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity
-              style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
-              onPress={() => router.push("/discover-filters")}
-            >
-              <Text style={[styles.filterBtnText, activeFilterCount > 0 && styles.filterBtnTextActive]}>
-                Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-              </Text>
-            </TouchableOpacity>
           </View>
         }
         renderSectionHeader={({ section }) =>
@@ -256,24 +255,24 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   filterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
     alignSelf: "flex-start",
-    borderRadius: 20,
+    borderRadius: 22,
     paddingHorizontal: spacing.md,
-    paddingVertical: 7,
+    paddingVertical: 10,
     marginBottom: spacing.md,
-    backgroundColor: colors.tintSurface,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  filterBtnActive: {
     backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   filterBtnText: {
-    fontSize: 13,
-    fontFamily: fontFamily.semiBold,
-    color: colors.primary,
-  },
-  filterBtnTextActive: {
+    fontSize: 14,
+    fontFamily: fontFamily.bold,
     color: "#fff",
   },
   sortText: {
