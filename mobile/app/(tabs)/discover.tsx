@@ -54,7 +54,7 @@ export default function DiscoverScreen() {
     });
 
     if (sort !== "distance") {
-      return [{ title: null, data: sorted }];
+      return [{ title: "", data: sorted }];
     }
 
     // Group into distance bands
