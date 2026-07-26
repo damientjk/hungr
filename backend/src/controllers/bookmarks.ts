@@ -10,7 +10,7 @@ const BookmarkSchema = z.object({
 export async function getBookmarks(req: AuthRequest, res: Response) {
   const { data, error } = await supabase
     .from("bookmarks")
-    .select("restaurants(*), created_at")
+    .select("restaurants(*), created_at, folder_id")
     .eq("user_id", req.userId)
     .order("created_at", { ascending: false });
 
@@ -20,7 +20,9 @@ export async function getBookmarks(req: AuthRequest, res: Response) {
     return;
   }
 
-  res.json({ bookmarks: data?.map((d: any) => d.restaurants) ?? [] });
+  res.json({
+    bookmarks: data?.map((d: any) => ({ ...d.restaurants, folder_id: d.folder_id ?? null })) ?? [],
+  });
 }
 
 export async function addBookmark(req: AuthRequest, res: Response) {
