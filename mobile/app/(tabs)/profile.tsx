@@ -28,7 +28,7 @@ const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
 
 const DEFAULT_PRICE_MIN = 1;
 const DEFAULT_PRICE_MAX = 4;
-const DEFAULT_DISTANCE = 10000;
+const DEFAULT_DISTANCE = 5000;
 
 function formatFilterSummary(s: SessionSummary): string | null {
   const parts: string[] = [];

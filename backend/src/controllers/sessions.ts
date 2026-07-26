@@ -720,7 +720,7 @@ export async function listUserSessions(req: AuthRequest, res: Response) {
     owner_id: s.owner_id,
     invite_code: s.invite_code,
     cuisine_filters: s.cuisine_filters ?? [],
-    max_distance: s.max_distance ?? 10000,
+    max_distance: s.max_distance ?? 5000,
     price_min: s.price_min ?? 1,
     price_max: s.price_max ?? 4,
     halal: s.halal ?? false,

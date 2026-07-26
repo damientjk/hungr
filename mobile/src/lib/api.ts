@@ -328,5 +328,5 @@ export const DEFAULT_FILTERS: SessionFilterValues = {
   halal: false,
   vegetarian: false,
   vegan: false,
-  maxDistance: 10000,
+  maxDistance: 5000,
 };
