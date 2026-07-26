@@ -16,6 +16,7 @@ import {
 import { api, Restaurant, SwipeDirection } from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
 import { RestaurantCard } from "@/src/components/RestaurantCard";
+import { RestaurantListRow } from "@/src/components/RestaurantListRow";
 import { useSession } from "@/src/lib/SessionContext";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -101,6 +102,7 @@ export default function SwipeScreen() {
   const [phase, setPhase] = useState<Phase>("swiping");
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
   const [groupProgress, setGroupProgress] = useState({ done: 0, total: 1 });
+  const [showAllMatches, setShowAllMatches] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
 
   const position = useRef(new Animated.ValueXY()).current;
@@ -242,6 +244,7 @@ export default function SwipeScreen() {
   async function loadResults() {
     if (!session) return;
     setPhase("loading_results");
+    setShowAllMatches(false);
     try {
       const result = await api.sessions.matches(session.id);
       setMatchResult(result);
@@ -426,6 +429,7 @@ export default function SwipeScreen() {
 
     if (matches.length > 0) {
       const pick = matches[0];
+      const moreMatches = matches.slice(1);
       return (
         <Screen edges={["top"]}>
           <ScrollView style={resultScrollStyle} contentContainerStyle={styles.resultScroll} showsVerticalScrollIndicator={false}>
@@ -436,6 +440,25 @@ export default function SwipeScreen() {
               <RestaurantCard restaurant={pick} variant="stack" cardHeight={260} />
             </View>
             <PrimaryButton title="📍 Open in Maps" onPress={() => openMaps(pick)} variant="secondary" style={{ marginBottom: spacing.sm }} />
+
+            {moreMatches.length > 0 && !showAllMatches && (
+              <PrimaryButton
+                title={`Show ${moreMatches.length} more match${moreMatches.length > 1 ? "es" : ""}`}
+                onPress={() => setShowAllMatches(true)}
+                variant="secondary"
+                style={{ marginBottom: spacing.sm }}
+              />
+            )}
+
+            {showAllMatches && moreMatches.length > 0 && (
+              <View style={styles.moreMatchesSection}>
+                <Text style={styles.moreMatchesLabel}>Also agreed on:</Text>
+                {moreMatches.map((m) => (
+                  <RestaurantListRow key={m.id} restaurant={m} />
+                ))}
+              </View>
+            )}
+
             <PrimaryButton title="End Session" onPress={endAndLeave} />
           </ScrollView>
         </Screen>
@@ -649,6 +672,16 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: spacing.lg,
     alignItems: "center",
+  },
+  moreMatchesSection: {
+    width: "100%",
+    marginBottom: spacing.md,
+  },
+  moreMatchesLabel: {
+    fontSize: 14,
+    fontFamily: fontFamily.semiBold,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
   },
   likeBar: {
     backgroundColor: colors.tintSurface,
