@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabase } from "../lib/supabase";
 import { fetchAllNearbyRestaurants } from "../lib/places";
 import { refreshStalePhotos } from "../lib/photoFreshness";
+import { effectiveCuisineFilters, buildSearchTags } from "../lib/dietaryFilters";
 import { autocompletePlaces } from "../lib/geocode";
 import { AuthRequest } from "../middleware/auth";
 
@@ -32,6 +33,9 @@ const NearbySchema = z.object({
   longitude: z.coerce.number().min(-180).max(180),
   radius: z.coerce.number().min(100).max(50000).default(5000),
   cuisine: z.string().optional(),
+  halal: z.enum(["true", "false"]).optional(),
+  vegetarian: z.enum(["true", "false"]).optional(),
+  vegan: z.enum(["true", "false"]).optional(),
   limit: z.coerce.number().min(1).max(100).optional(),
 });
 
@@ -42,22 +46,30 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
     return;
   }
 
-  const { latitude, longitude, radius, cuisine, limit } = parsed.data;
-
-  // Check how many restaurants we already have near this location
-  const { data: existing } = await supabase.rpc("restaurants_near_point", {
+  const { latitude, longitude, radius, cuisine, halal, vegetarian, vegan, limit } = parsed.data;
+  const dietary = {
+    cuisineFilters: cuisine ? [cuisine.toLowerCase()] : [],
+    halal: halal === "true",
+    vegetarian: vegetarian === "true",
+    vegan: vegan === "true",
+  };
+  const cuisineFilters = effectiveCuisineFilters(dietary);
+  const rpcArgs = {
     lat: latitude,
     lng: longitude,
     radius_meters: radius,
     exclude_user_id: req.userId,
-    cuisine_filters: null,
-  });
+    cuisine_filters: cuisineFilters.length > 0 ? cuisineFilters : null,
+  };
+
+  // Check how many restaurants we already have near this location
+  const { data: existing } = await supabase.rpc("restaurants_near_point", rpcArgs);
   const nearbyCount = existing?.length ?? 0;
 
   // Fetch from Google Places if we don't have enough local results
   if (nearbyCount < 20) {
     try {
-      const allPlaces = await fetchAllNearbyRestaurants(latitude, longitude, radius);
+      const allPlaces = await fetchAllNearbyRestaurants(latitude, longitude, radius, buildSearchTags(dietary));
       console.log(`Fetched ${allPlaces.length} restaurants from Places API`);
       if (allPlaces.length > 0) {
         const { error: upsertError } = await supabase
@@ -71,13 +83,7 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
   }
 
   // Query from Supabase via PostGIS RPC, excluding already-swiped restaurants
-  const { data, error } = await supabase.rpc("restaurants_near_point", {
-    lat: latitude,
-    lng: longitude,
-    radius_meters: radius,
-    exclude_user_id: req.userId,
-    cuisine_filters: cuisine ? [cuisine.toLowerCase()] : null,
-  });
+  const { data, error } = await supabase.rpc("restaurants_near_point", rpcArgs);
 
   if (error) {
     console.error("RPC error:", error);

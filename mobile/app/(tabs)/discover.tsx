@@ -38,13 +38,16 @@ export default function DiscoverScreen() {
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
   const [toggling, setToggling] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<SortKey>("distance");
+  const [halal, setHalal] = useState(false);
+  const [vegetarian, setVegetarian] = useState(false);
+  const [vegan, setVegan] = useState(false);
 
   useEffect(() => {
     if (coords) {
       fetchRestaurants();
       fetchBookmarks();
     }
-  }, [coords]);
+  }, [coords, halal, vegetarian, vegan]);
 
   const sections = useMemo((): { title: string; data: Restaurant[] }[] => {
     const sorted = [...restaurants].sort((a, b) => {
@@ -81,6 +84,9 @@ export default function DiscoverScreen() {
       const { restaurants } = await api.restaurants.nearby({
         latitude: coords.latitude,
         longitude: coords.longitude,
+        halal,
+        vegetarian,
+        vegan,
       });
       setRestaurants(restaurants);
     } catch (e) {
@@ -172,6 +178,26 @@ export default function DiscoverScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
+            </View>
+            <View style={styles.sortRow}>
+              <TouchableOpacity
+                style={[styles.sortBtn, halal && styles.sortBtnActive]}
+                onPress={() => setHalal((v) => !v)}
+              >
+                <Text style={[styles.sortText, halal && styles.sortTextActive]}>Halal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sortBtn, vegetarian && styles.sortBtnActive]}
+                onPress={() => setVegetarian((v) => !v)}
+              >
+                <Text style={[styles.sortText, vegetarian && styles.sortTextActive]}>Vegetarian</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sortBtn, vegan && styles.sortBtnActive]}
+                onPress={() => setVegan((v) => !v)}
+              >
+                <Text style={[styles.sortText, vegan && styles.sortTextActive]}>Vegan</Text>
+              </TouchableOpacity>
             </View>
           </View>
         }

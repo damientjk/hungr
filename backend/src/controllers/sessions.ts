@@ -2,10 +2,11 @@ import { Response } from "express";
 import { z } from "zod";
 import { supabase } from "../lib/supabase";
 import { AuthRequest } from "../middleware/auth";
-import { fetchAllNearbyRestaurants, SearchTag } from "../lib/places";
+import { fetchAllNearbyRestaurants } from "../lib/places";
 import { refreshStalePhotos } from "../lib/photoFreshness";
 import { geocodeAddress } from "../lib/geocode";
 import { handleOwnerDeparture, touchParticipant, withDisconnectedFlag } from "../lib/presence";
+import { effectiveCuisineFilters, buildSearchTags } from "../lib/dietaryFilters";
 
 const CreateSessionSchema = z.object({
   name: z.string().min(1).max(100),
@@ -32,24 +33,6 @@ interface SessionFilters {
 /** Normalise cuisine labels: lowercase, trimmed, de-duplicated, non-empty. */
 function normaliseCuisines(cuisines: string[]): string[] {
   return [...new Set(cuisines.map((c) => c.trim().toLowerCase()).filter(Boolean))];
-}
-
-/** Cuisine labels plus any dietary flags, used for DB-side filtering. */
-function effectiveCuisineFilters(f: SessionFilters): string[] {
-  const arr = [...f.cuisineFilters];
-  if (f.halal) arr.push("halal");
-  if (f.vegetarian) arr.push("vegetarian");
-  if (f.vegan) arr.push("vegan");
-  return arr;
-}
-
-/** Keyword searches to run against Places to populate tagged restaurants. */
-function buildSearchTags(f: SessionFilters): SearchTag[] {
-  const tags: SearchTag[] = f.cuisineFilters.map((c) => ({ keyword: c, label: c }));
-  if (f.halal) tags.push({ keyword: "halal", label: "halal" });
-  if (f.vegetarian) tags.push({ keyword: "vegetarian", label: "vegetarian" });
-  if (f.vegan) tags.push({ keyword: "vegan", label: "vegan" });
-  return tags;
 }
 
 export async function getSession(req: AuthRequest, res: Response) {

@@ -99,6 +99,9 @@ export const api = {
       longitude: number;
       radius?: number;
       cuisine?: string;
+      halal?: boolean;
+      vegetarian?: boolean;
+      vegan?: boolean;
       limit?: number;
     }) => {
       const qs = new URLSearchParams(
