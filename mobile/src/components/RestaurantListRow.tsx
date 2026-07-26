@@ -1,4 +1,4 @@
-import { View, Text, Image, TouchableOpacity, Linking, StyleSheet } from "react-native";
+import { View, Text, Image, TouchableOpacity, Linking, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Restaurant } from "@/src/lib/api";
 import { colors } from "@/src/theme/colors";
@@ -24,7 +24,9 @@ interface Props {
 
 function openMaps(restaurant: Restaurant) {
   const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
-  Linking.openURL(`https://maps.google.com/?q=${query}`);
+  Linking.openURL(`https://maps.google.com/?q=${query}`).catch(() => {
+    Alert.alert("Could not open Maps", "Please check that you have a maps app installed.");
+  });
 }
 
 export function RestaurantListRow({ restaurant, rightAction, folderAction, subtitle }: Props) {

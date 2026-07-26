@@ -44,6 +44,30 @@ function photoUrl(ref: string): string {
 }
 
 /**
+ * Look up a fresh photo_reference for a place by ID and build its photo URL.
+ * `photo_reference` tokens (baked into our cached `photo_url`) can go stale
+ * over time, unlike `place_id` — use this to re-resolve one when that happens.
+ */
+export async function refreshPlacePhoto(placeId: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${BASE}/details/json?place_id=${encodeURIComponent(placeId)}&fields=photo&key=${KEY}`
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      status: string;
+      result?: { photos?: { photo_reference: string }[] };
+    };
+    if (data.status !== "OK") return null;
+    const ref = data.result?.photos?.[0]?.photo_reference;
+    return ref ? photoUrl(ref) : null;
+  } catch (e) {
+    console.error(`Failed to refresh photo for place ${placeId}:`, e);
+    return null;
+  }
+}
+
+/**
  * Map raw Places results to our restaurant shape. When `tagLabel` is supplied
  * (keyword search), it is appended to every result's cuisines so the result can
  * later be filtered by that tag (e.g. "japanese", "halal", "vegetarian").

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabase } from "../lib/supabase";
 import { AuthRequest } from "../middleware/auth";
 import { fetchAllNearbyRestaurants, SearchTag } from "../lib/places";
+import { refreshStalePhotos } from "../lib/photoFreshness";
 import { geocodeAddress } from "../lib/geocode";
 
 const CreateSessionSchema = z.object({
@@ -470,6 +471,7 @@ export async function getSessionRestaurants(req: AuthRequest, res: Response) {
     .map((r: any) => ({ ...r, distance_meters: distanceBy.get(r.id) ?? null }))
     .sort((a: any, b: any) => (positionBy.get(a.id) ?? 0) - (positionBy.get(b.id) ?? 0));
 
+  await refreshStalePhotos(restaurants);
   res.json({ restaurants });
 }
 
@@ -539,6 +541,7 @@ export async function refreshSessionRestaurants(req: AuthRequest, res: Response)
     .map((r: any) => ({ ...r, distance_meters: distanceBy.get(r.id) ?? null }))
     .sort((a: any, b: any) => (positionBy.get(a.id) ?? 0) - (positionBy.get(b.id) ?? 0));
 
+  await refreshStalePhotos(restaurants);
   res.json({ restaurants });
 }
 
@@ -730,6 +733,9 @@ export async function getSessionMatches(req: AuthRequest, res: Response) {
       }
     }
   }
+
+  await refreshStalePhotos(matches ?? []);
+  if (topMatch) await refreshStalePhotos([topMatch]);
 
   res.json({ matches: matches ?? [], topMatch, participantCount, doneCount, allDone });
 }

@@ -2,6 +2,7 @@ import { Response } from "express";
 import { z } from "zod";
 import { supabase } from "../lib/supabase";
 import { fetchAllNearbyRestaurants } from "../lib/places";
+import { refreshStalePhotos } from "../lib/photoFreshness";
 import { autocompletePlaces } from "../lib/geocode";
 import { AuthRequest } from "../middleware/auth";
 
@@ -85,6 +86,7 @@ export async function getNearbyRestaurants(req: AuthRequest, res: Response) {
   }
 
   const results = limit ? (data ?? []).slice(0, limit) : (data ?? []);
+  await refreshStalePhotos(results);
   res.json({ restaurants: results });
 }
 

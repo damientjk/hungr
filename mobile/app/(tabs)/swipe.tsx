@@ -419,7 +419,9 @@ export default function SwipeScreen() {
 
     function openMaps(restaurant: Restaurant) {
       const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
-      Linking.openURL(`https://maps.google.com/?q=${query}`);
+      Linking.openURL(`https://maps.google.com/?q=${query}`).catch(() => {
+        Alert.alert("Could not open Maps", "Please check that you have a maps app installed.");
+      });
     }
 
     if (matches.length > 0) {
