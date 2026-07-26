@@ -10,6 +10,11 @@ const CreateSessionSchema = z.object({
   cuisineFilters: z.array(z.string()).default([]),
   maxDistance: z.number().min(1000).max(50000).default(5000),
   inviteCode: z.string().length(6).toUpperCase().optional(),
+  priceMin: z.number().min(1).max(4).default(1),
+  priceMax: z.number().min(1).max(4).default(4),
+  halal: z.boolean().default(false),
+  vegetarian: z.boolean().default(false),
+  vegan: z.boolean().default(false),
 });
 
 // ── Filters ───────────────────────────────────────────────────────────────
@@ -137,6 +142,11 @@ export async function createSession(req: AuthRequest, res: Response) {
     name: parsed.data.name,
     cuisine_filters: parsed.data.cuisineFilters,
     max_distance: parsed.data.maxDistance,
+    price_min: parsed.data.priceMin,
+    price_max: parsed.data.priceMax,
+    halal: parsed.data.halal,
+    vegetarian: parsed.data.vegetarian,
+    vegan: parsed.data.vegan,
     status: "active",
   };
   if (parsed.data.inviteCode) insert.invite_code = parsed.data.inviteCode;

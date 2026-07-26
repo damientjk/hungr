@@ -25,6 +25,7 @@ import { fontFamily } from "@/src/theme/typography";
 import { screenStyles } from "@/src/theme/screenStyles";
 
 const PRICE_LABELS = ["", "$", "$$", "$$$", "$$$$"];
+
 const DEFAULT_PRICE_MIN = 1;
 const DEFAULT_PRICE_MAX = 4;
 const DEFAULT_DISTANCE = 10000;
@@ -40,11 +41,14 @@ function formatFilterSummary(s: SessionSummary): string | null {
   const priceMax = s.price_max ?? DEFAULT_PRICE_MAX;
   const distance = s.max_distance ?? DEFAULT_DISTANCE;
 
-  if (priceMin !== DEFAULT_PRICE_MIN || priceMax !== DEFAULT_PRICE_MAX) {
+  const nonDefaultPrice = priceMin !== DEFAULT_PRICE_MIN || priceMax !== DEFAULT_PRICE_MAX;
+  const nonDefaultDistance = distance !== DEFAULT_DISTANCE;
+
+  if (nonDefaultPrice) {
     parts.push(priceMin === priceMax ? PRICE_LABELS[priceMin] : `${PRICE_LABELS[priceMin]}–${PRICE_LABELS[Math.round(priceMax)]}`);
   }
 
-  if (distance !== DEFAULT_DISTANCE) {
+  if (nonDefaultDistance) {
     parts.push(`${Math.round(distance / 1000)}km`);
   }
 

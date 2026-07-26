@@ -131,6 +131,11 @@ export const api = {
       cuisineFilters?: string[];
       maxDistance?: number;
       inviteCode?: string;
+      priceMin?: number;
+      priceMax?: number;
+      halal?: boolean;
+      vegetarian?: boolean;
+      vegan?: boolean;
     }) =>
       request<{ session: Session }>("/api/sessions", {
         method: "POST",
