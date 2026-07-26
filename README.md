@@ -6,7 +6,7 @@
 
 **Team:** Tan Jeng Khiang Damien, Jenna Ng Kai Ern
 
-Milestone 2 submission
+Milestone 3 submission
 
 ---
 
