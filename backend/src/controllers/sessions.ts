@@ -5,6 +5,7 @@ import { AuthRequest } from "../middleware/auth";
 import { fetchAllNearbyRestaurants, SearchTag } from "../lib/places";
 import { refreshStalePhotos } from "../lib/photoFreshness";
 import { geocodeAddress } from "../lib/geocode";
+import { handleOwnerDeparture, touchParticipant, withDisconnectedFlag } from "../lib/presence";
 
 const CreateSessionSchema = z.object({
   name: z.string().min(1).max(100),
@@ -97,7 +98,7 @@ export async function getSessionParticipants(req: AuthRequest, res: Response) {
 
   const { data: rows, error } = await supabase
     .from("session_participants")
-    .select("user_id")
+    .select("user_id, last_active_at")
     .eq("session_id", id);
 
   if (error) {
@@ -112,10 +113,12 @@ export async function getSessionParticipants(req: AuthRequest, res: Response) {
     return;
   }
 
+  const withPresence = withDisconnectedFlag(rows ?? []);
+
   // Nickname/avatar live in auth.users' user_metadata, which isn't exposed via
   // the regular Postgres API — look each member up through the admin API.
   const participants = await Promise.all(
-    (rows ?? []).map(async (r: any) => {
+    withPresence.map(async (r) => {
       const { data } = await supabase.auth.admin.getUserById(r.user_id);
       const u = data?.user;
       return {
@@ -124,11 +127,101 @@ export async function getSessionParticipants(req: AuthRequest, res: Response) {
         avatarUrl: u?.user_metadata?.avatar_url ?? null,
         email: u?.email ?? null,
         isOwner: r.user_id === session.owner_id,
+        disconnected: r.disconnected,
       };
     })
   );
 
   res.json({ participants });
+}
+
+/** The active/swiping session (if any) the user is still a participant of — used to auto-rejoin after reopening the app. */
+export async function getCurrentSession(req: AuthRequest, res: Response) {
+  const { data: rows } = await supabase
+    .from("session_participants")
+    .select("session_id")
+    .eq("user_id", req.userId);
+
+  const sessionIds = (rows ?? []).map((r: any) => r.session_id);
+  if (sessionIds.length === 0) {
+    res.json({ session: null });
+    return;
+  }
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("*")
+    .in("id", sessionIds)
+    .in("status", ["active", "swiping"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (session && req.userId) {
+    await touchParticipant(session.id, req.userId);
+  }
+
+  res.json({ session: session ?? null });
+}
+
+/** Self-initiated leave. If the leaver is the owner, ownership is handed off (or the session closed) first. */
+export async function leaveSession(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("owner_id")
+    .eq("id", id)
+    .single();
+
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  if (session.owner_id === req.userId) {
+    await handleOwnerDeparture(id, req.userId!);
+  }
+
+  await supabase.from("session_participants").delete().eq("session_id", id).eq("user_id", req.userId);
+
+  res.json({ success: true });
+}
+
+const KickSchema = z.object({ userId: z.string().uuid() });
+
+/** Owner-only: remove a participant. Their prior swipes stay recorded but stop counting toward unanimity. */
+export async function kickParticipant(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const parsed = KickSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "userId is required" });
+    return;
+  }
+  const { userId: targetUserId } = parsed.data;
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("owner_id")
+    .eq("id", id)
+    .single();
+
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+  if (session.owner_id !== req.userId) {
+    res.status(403).json({ error: "Only the session owner can remove members" });
+    return;
+  }
+  if (targetUserId === req.userId) {
+    res.status(400).json({ error: "Use leave instead of removing yourself" });
+    return;
+  }
+
+  await supabase.from("session_participants").delete().eq("session_id", id).eq("user_id", targetUserId);
+
+  res.json({ success: true });
 }
 
 export async function createSession(req: AuthRequest, res: Response) {

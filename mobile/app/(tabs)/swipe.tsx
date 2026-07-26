@@ -13,7 +13,7 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
-import { api, Restaurant, SwipeDirection } from "@/src/lib/api";
+import { api, ApiError, Restaurant, SwipeDirection } from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
 import { RestaurantCard } from "@/src/components/RestaurantCard";
 import { RestaurantListRow } from "@/src/components/RestaurantListRow";
@@ -187,10 +187,16 @@ export default function SwipeScreen() {
     const interval = setInterval(async () => {
       try {
         const { session: latest } = await api.sessions.get(session.id);
-        if (latest.status === "swiping") {
+        if (latest.status === "closed") {
+          setSession(null);
+        } else {
+          // Always resync (not just on status change) so an owner transfer
+          // that happened server-side is reflected here too.
           setSession(latest);
         }
-      } catch {}
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 403) setSession(null);
+      }
     }, 3000);
     return () => clearInterval(interval);
   }, [session?.id, session?.status]);

@@ -45,6 +45,15 @@ async function getAuthHeader(): Promise<string> {
   return `Bearer ${token}`;
 }
 
+/** Thrown by `request()` on a non-OK response; carries the HTTP status so callers can branch on it (e.g. 403 = removed from a session). */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function parseJsonResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   if (!text) return {} as T;
@@ -77,7 +86,7 @@ async function request<T>(
   const body = await parseJsonResponse<{ error?: string } & T>(res);
 
   if (!res.ok) {
-    throw new Error(body.error ?? `Request failed: ${res.status}`);
+    throw new ApiError(body.error ?? `Request failed: ${res.status}`, res.status);
   }
 
   return body;
@@ -124,8 +133,17 @@ export const api = {
   sessions: {
     get: (id: string) =>
       request<{ session: Session }>(`/api/sessions/${id}`),
+    /** The active/swiping session (if any) the logged-in user is still a participant of. */
+    current: () => request<{ session: Session | null }>("/api/sessions/current"),
     participants: (id: string) =>
       request<{ participants: SessionParticipant[] }>(`/api/sessions/${id}/participants`),
+    leave: (id: string) =>
+      request(`/api/sessions/${id}/leave`, { method: "POST" }),
+    kick: (id: string, userId: string) =>
+      request(`/api/sessions/${id}/kick`, {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      }),
     create: (payload: {
       name: string;
       cuisineFilters?: string[];
@@ -245,6 +263,7 @@ export interface SessionParticipant {
   avatarUrl: string | null;
   email: string | null;
   isOwner: boolean;
+  disconnected: boolean;
 }
 
 export interface SessionSummary {

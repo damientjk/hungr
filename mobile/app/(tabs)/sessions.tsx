@@ -15,7 +15,7 @@ import {
   Platform,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { api, Restaurant, SessionFilterValues, DEFAULT_FILTERS, SessionParticipant } from "@/src/lib/api";
+import { api, ApiError, Restaurant, SessionFilterValues, DEFAULT_FILTERS, SessionParticipant } from "@/src/lib/api";
 import { SessionFilters } from "@/src/components/SessionFilters";
 import { useSession } from "@/src/lib/SessionContext";
 import { useLocation } from "@/src/hooks/useLocation";
@@ -114,16 +114,23 @@ export default function SessionsScreen() {
       if (!session) return;
       api.sessions.get(session.id)
         .then(({ session: latest }) => {
-          if (latest.status !== session.status) {
-            if (latest.status === "closed") {
-              setSession(null);
-            } else {
-              setSession(latest);
-              if (latest.status === "swiping") router.push("/(tabs)/swipe");
+          if (latest.status === "closed") {
+            setSession(null);
+          } else {
+            // Always resync (not just on status change) so an owner transfer
+            // that happened server-side is picked up here too.
+            setSession(latest);
+            if (latest.status === "swiping" && session.status !== "swiping") {
+              router.push("/(tabs)/swipe");
             }
           }
         })
-        .catch(() => {});
+        .catch((e) => {
+          if (e instanceof ApiError && e.status === 403) {
+            setSession(null);
+            Alert.alert("Removed from session", "You're no longer part of this session.");
+          }
+        });
     }, [session?.id, session?.status])
   );
 
@@ -137,11 +144,19 @@ export default function SessionsScreen() {
         const { session: latest } = await api.sessions.get(session.id);
         if (latest.status === "closed") {
           setSession(null);
-        } else if (latest.status === "swiping" && session.status === "active") {
+        } else {
           setSession(latest);
-          router.push("/(tabs)/swipe");
+          if (latest.status === "swiping" && session.status === "active") {
+            router.push("/(tabs)/swipe");
+          }
         }
-      } catch {}
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 403) {
+          setSession(null);
+          Alert.alert("Removed from session", "You're no longer part of this session.");
+          return;
+        }
+      }
       fetchParticipants();
     }, 3000);
     return () => clearInterval(interval);
@@ -236,6 +251,38 @@ export default function SessionsScreen() {
     }
   }
 
+  async function leaveSessionAction() {
+    if (!session) return;
+    const id = session.id;
+    setSession(null);
+    try {
+      await api.sessions.leave(id);
+    } catch {}
+  }
+
+  function confirmKick(participant: SessionParticipant, label: string) {
+    Alert.alert(
+      "Remove member?",
+      `${label} will be removed from this session and any swipes they've made won't count toward a match.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            if (!session) return;
+            try {
+              await api.sessions.kick(session.id, participant.id);
+              fetchParticipants();
+            } catch (e: any) {
+              Alert.alert("Couldn't remove member", e?.message ?? "Please try again.");
+            }
+          },
+        },
+      ]
+    );
+  }
+
   async function shareInviteCode() {
     if (!session) return;
     await Share.share({
@@ -288,15 +335,32 @@ export default function SessionsScreen() {
             >
               {participants.map((p) => {
                 const label = p.nickname || p.email?.split("@")[0] || "Guest";
+                const canKick = isOwner && p.id !== myUserId;
                 return (
                   <View key={p.id} style={styles.participantChip}>
-                    <View style={styles.participantAvatar}>
-                      {p.avatarUrl ? (
-                        <Image source={{ uri: p.avatarUrl }} style={styles.participantAvatarImage} />
-                      ) : (
-                        <Text style={styles.participantAvatarText}>
-                          {label.charAt(0).toUpperCase()}
-                        </Text>
+                    <View style={styles.avatarWrap}>
+                      <View
+                        style={[
+                          styles.participantAvatar,
+                          p.disconnected && styles.participantAvatarDisconnected,
+                        ]}
+                      >
+                        {p.avatarUrl ? (
+                          <Image source={{ uri: p.avatarUrl }} style={styles.participantAvatarImage} />
+                        ) : (
+                          <Text style={styles.participantAvatarText}>
+                            {label.charAt(0).toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      {canKick && (
+                        <TouchableOpacity
+                          style={styles.kickBadge}
+                          onPress={() => confirmKick(p, label)}
+                          hitSlop={6}
+                        >
+                          <Text style={styles.kickBadgeText}>×</Text>
+                        </TouchableOpacity>
                       )}
                     </View>
                     <Text style={styles.participantName} numberOfLines={1}>
@@ -304,6 +368,7 @@ export default function SessionsScreen() {
                       {p.id === myUserId ? " (You)" : ""}
                     </Text>
                     {p.isOwner && <Text style={styles.participantOwnerTag}>Owner</Text>}
+                    {p.disconnected && <Text style={styles.participantDisconnectedTag}>Disconnected</Text>}
                   </View>
                 );
               })}
@@ -418,7 +483,7 @@ export default function SessionsScreen() {
 
         <TouchableOpacity
           style={styles.leaveButton}
-          onPress={() => setSession(null)}
+          onPress={leaveSessionAction}
         >
           <Text style={styles.leaveText}>Leave session</Text>
         </TouchableOpacity>
@@ -596,6 +661,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: 64,
   },
+  avatarWrap: {
+    width: 48,
+    height: 48,
+  },
   participantAvatar: {
     width: 48,
     height: 48,
@@ -608,6 +677,9 @@ const styles = StyleSheet.create({
     borderColor: colors.tintSurface,
     overflow: "hidden",
   },
+  participantAvatarDisconnected: {
+    opacity: 0.4,
+  },
   participantAvatarImage: {
     width: "100%",
     height: "100%",
@@ -616,6 +688,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: fontFamily.extraBold,
     color: "#fff",
+  },
+  kickBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.destructive,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  kickBadgeText: {
+    color: "#fff",
+    fontSize: 13,
+    fontFamily: fontFamily.bold,
+    lineHeight: 14,
   },
   participantName: {
     fontSize: 11,
@@ -627,6 +718,12 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: fontFamily.bold,
     color: colors.primary,
+    marginTop: 1,
+  },
+  participantDisconnectedTag: {
+    fontSize: 9,
+    fontFamily: fontFamily.semiBold,
+    color: colors.destructive,
     marginTop: 1,
   },
   startButton: {
