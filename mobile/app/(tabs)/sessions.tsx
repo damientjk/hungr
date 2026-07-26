@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -28,6 +28,8 @@ import { screenStyles } from "@/src/theme/screenStyles";
 
 export default function SessionsScreen() {
   const { session, setSession } = useSession();
+  const sessionRef = useRef(session);
+  useEffect(() => { sessionRef.current = session; }, [session]);
   const router = useRouter();
   const { coords, error: locationError } = useLocation();
   const [joinCode, setJoinCode] = useState("");
@@ -91,8 +93,9 @@ export default function SessionsScreen() {
           filter: `id=eq.${session.id}`,
         },
         (payload: any) => {
+          if (!sessionRef.current) return;
           const updated = payload.new;
-          setSession({ ...session, status: updated.status });
+          setSession({ ...sessionRef.current, status: updated.status });
           if (updated.status === "swiping") {
             router.push("/(tabs)/swipe");
           }
@@ -112,20 +115,23 @@ export default function SessionsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!session) return;
+      const wasSwiping = session.status === "swiping";
       api.sessions.get(session.id)
         .then(({ session: latest }) => {
+          if (!sessionRef.current) return;
           if (latest.status === "closed") {
             setSession(null);
           } else {
             // Always resync (not just on status change) so an owner transfer
             // that happened server-side is picked up here too.
             setSession(latest);
-            if (latest.status === "swiping" && session.status !== "swiping") {
+            if (latest.status === "swiping" && !wasSwiping) {
               router.push("/(tabs)/swipe");
             }
           }
         })
         .catch((e) => {
+          if (!sessionRef.current) return;
           if (e instanceof ApiError && e.status === 403) {
             setSession(null);
             Alert.alert("Removed from session", "You're no longer part of this session.");
@@ -139,25 +145,28 @@ export default function SessionsScreen() {
   // `sessions`, not `session_participants`, is in the realtime publication).
   useEffect(() => {
     if (!session || (session.status !== "active" && session.status !== "swiping")) return;
+    const wasActive = session.status === "active";
     const interval = setInterval(async () => {
       try {
         const { session: latest } = await api.sessions.get(session.id);
+        if (!sessionRef.current) return;
         if (latest.status === "closed") {
           setSession(null);
         } else {
           setSession(latest);
-          if (latest.status === "swiping" && session.status === "active") {
+          if (latest.status === "swiping" && wasActive) {
             router.push("/(tabs)/swipe");
           }
         }
       } catch (e) {
+        if (!sessionRef.current) return;
         if (e instanceof ApiError && e.status === 403) {
           setSession(null);
           Alert.alert("Removed from session", "You're no longer part of this session.");
           return;
         }
       }
-      fetchParticipants();
+      if (sessionRef.current) fetchParticipants();
     }, 3000);
     return () => clearInterval(interval);
   }, [session?.id, session?.status]);
@@ -253,11 +262,13 @@ export default function SessionsScreen() {
 
   async function leaveSessionAction() {
     if (!session) return;
-    const id = session.id;
-    setSession(null);
     try {
-      await api.sessions.leave(id);
-    } catch {}
+      await api.sessions.leave(session.id);
+    } catch (e: any) {
+      Alert.alert("Couldn't leave session", e?.message ?? "Please try again.");
+      return;
+    }
+    setSession(null);
   }
 
   function confirmKick(participant: SessionParticipant, label: string) {
