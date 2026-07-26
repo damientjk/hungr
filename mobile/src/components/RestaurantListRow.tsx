@@ -14,6 +14,11 @@ interface Props {
     filled?: boolean;
     onPress: () => void;
   };
+  folderAction?: {
+    folderId: string | null;
+    folderName?: string | null;
+    onPress: () => void;
+  };
   subtitle?: string;
 }
 
@@ -22,7 +27,7 @@ function openMaps(restaurant: Restaurant) {
   Linking.openURL(`https://maps.google.com/?q=${query}`);
 }
 
-export function RestaurantListRow({ restaurant, rightAction, subtitle }: Props) {
+export function RestaurantListRow({ restaurant, rightAction, folderAction, subtitle }: Props) {
   return (
     <TouchableOpacity style={styles.item} onPress={() => openMaps(restaurant)} activeOpacity={0.75}>
       {restaurant.photo_url ? (
@@ -50,6 +55,18 @@ export function RestaurantListRow({ restaurant, rightAction, subtitle }: Props) 
           </Text>
         ) : null}
       </View>
+      {folderAction && (
+        <TouchableOpacity style={styles.folderBtn} onPress={folderAction.onPress}>
+          <Ionicons
+            name={folderAction.folderId ? "folder" : "folder-outline"}
+            size={22}
+            color={folderAction.folderId ? colors.primary : colors.textLight}
+          />
+          <Text style={[styles.folderBtnLabel, folderAction.folderId && styles.folderBtnLabelActive]} numberOfLines={1}>
+            {folderAction.folderId && folderAction.folderName ? folderAction.folderName : "move"}
+          </Text>
+        </TouchableOpacity>
+      )}
       {rightAction && (
         <TouchableOpacity style={styles.actionBtn} onPress={rightAction.onPress}>
           <Ionicons
@@ -111,5 +128,19 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     padding: spacing.sm,
+  },
+  folderBtn: {
+    alignItems: "center",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  folderBtnLabel: {
+    fontSize: 10,
+    fontFamily: fontFamily.regular,
+    color: colors.textLight,
+    marginTop: 0,
+  },
+  folderBtnLabelActive: {
+    color: colors.primary,
   },
 });

@@ -182,6 +182,20 @@ export const api = {
       }),
     remove: (restaurantId: string) =>
       request(`/api/bookmarks/${restaurantId}`, { method: "DELETE" }),
+    setFolder: (restaurantId: string, folderId: string | null) =>
+      request(`/api/folders/bookmarks/${restaurantId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ folderId }),
+      }),
+  },
+  folders: {
+    list: () => request<{ folders: Folder[] }>("/api/folders"),
+    create: (name: string) =>
+      request<{ folder: Folder }>("/api/folders", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
+    delete: (id: string) => request(`/api/folders/${id}`, { method: "DELETE" }),
   },
   account: {
     resetData: () => request("/api/account/data", { method: "DELETE" }),
@@ -199,6 +213,14 @@ export interface Restaurant {
   photo_url: string | null;
   address: string;
   distance_meters: number;
+  folder_id?: string | null;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  created_at: string;
+  count: number;
 }
 
 export interface Session {
