@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -38,9 +38,8 @@ export default function SessionsScreen() {
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SessionFilterValues>(DEFAULT_FILTERS);
-  const prevSessionIdRef = useRef<string | null>(null);
-  if (session?.id !== prevSessionIdRef.current) {
-    prevSessionIdRef.current = session?.id ?? null;
+
+  useEffect(() => {
     if (session) {
       setFilters({
         cuisineFilters: session.cuisine_filters ?? [],
@@ -54,7 +53,7 @@ export default function SessionsScreen() {
     } else {
       setFilters(DEFAULT_FILTERS);
     }
-  }
+  }, [session?.id]);
   const [matchResult, setMatchResult] = useState<{
     matches: Restaurant[];
     topMatch: (Restaurant & { likeCount: number }) | null;
