@@ -7,8 +7,10 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { api, Restaurant } from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
+import { useDiscoverFilters } from "@/src/lib/DiscoverFiltersContext";
 import { Screen } from "@/src/components/ui/Screen";
 import { RestaurantListRow } from "@/src/components/RestaurantListRow";
 import { colors } from "@/src/theme/colors";
@@ -21,7 +23,7 @@ type SortKey = "distance" | "rating" | "price";
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "distance", label: "Nearest" },
   { key: "rating", label: "Top Rated" },
-  { key: "price", label: "Price" },
+  { key: "price", label: "Price - Cheapest first" },
 ];
 
 const DISTANCE_BANDS = [
@@ -32,15 +34,16 @@ const DISTANCE_BANDS = [
 ];
 
 export default function DiscoverScreen() {
+  const router = useRouter();
   const { coords, loading: locationLoading, error: locationError } = useLocation();
+  const { filters } = useDiscoverFilters();
+  const { halal, vegetarian, vegan } = filters;
+  const activeFilterCount = [halal, vegetarian, vegan].filter(Boolean).length;
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(false);
   const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
   const [toggling, setToggling] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<SortKey>("distance");
-  const [halal, setHalal] = useState(false);
-  const [vegetarian, setVegetarian] = useState(false);
-  const [vegan, setVegan] = useState(false);
 
   useEffect(() => {
     if (coords) {
@@ -166,6 +169,7 @@ export default function DiscoverScreen() {
         ListHeaderComponent={
           <View>
             <Text style={screenStyles.header}>Discover</Text>
+            <Text style={styles.sortByLabel}>Sort by:</Text>
             <View style={styles.sortRow}>
               {SORT_OPTIONS.map((opt) => (
                 <TouchableOpacity
@@ -179,26 +183,14 @@ export default function DiscoverScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <View style={styles.sortRow}>
-              <TouchableOpacity
-                style={[styles.sortBtn, halal && styles.sortBtnActive]}
-                onPress={() => setHalal((v) => !v)}
-              >
-                <Text style={[styles.sortText, halal && styles.sortTextActive]}>Halal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.sortBtn, vegetarian && styles.sortBtnActive]}
-                onPress={() => setVegetarian((v) => !v)}
-              >
-                <Text style={[styles.sortText, vegetarian && styles.sortTextActive]}>Vegetarian</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.sortBtn, vegan && styles.sortBtnActive]}
-                onPress={() => setVegan((v) => !v)}
-              >
-                <Text style={[styles.sortText, vegan && styles.sortTextActive]}>Vegan</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
+              onPress={() => router.push("/discover-filters")}
+            >
+              <Text style={[styles.filterBtnText, activeFilterCount > 0 && styles.filterBtnTextActive]}>
+                Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+              </Text>
+            </TouchableOpacity>
           </View>
         }
         renderSectionHeader={({ section }) =>
@@ -240,6 +232,12 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     paddingBottom: spacing.xl,
   },
+  sortByLabel: {
+    fontSize: 13,
+    fontFamily: fontFamily.semiBold,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
   sortRow: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -256,6 +254,27 @@ const styles = StyleSheet.create({
   sortBtnActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
+  },
+  filterBtn: {
+    alignSelf: "flex-start",
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    marginBottom: spacing.md,
+    backgroundColor: colors.tintSurface,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  filterBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  filterBtnText: {
+    fontSize: 13,
+    fontFamily: fontFamily.semiBold,
+    color: colors.primary,
+  },
+  filterBtnTextActive: {
+    color: "#fff",
   },
   sortText: {
     fontSize: 13,

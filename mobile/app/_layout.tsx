@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/src/hooks/useAuth";
 import { LoadingScreen } from "@/src/components/LoadingScreen";
 import { supabase } from "@/src/lib/supabase";
+import { DiscoverFiltersProvider } from "@/src/lib/DiscoverFiltersContext";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -58,7 +59,9 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <DiscoverFiltersProvider>
+        <Stack screenOptions={{ headerShown: false }} />
+      </DiscoverFiltersProvider>
     </GestureHandlerRootView>
   );
 }
