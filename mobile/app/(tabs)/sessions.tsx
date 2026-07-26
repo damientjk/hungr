@@ -656,6 +656,7 @@ const styles = StyleSheet.create({
   participantsRow: {
     gap: spacing.md,
     paddingRight: spacing.md,
+    paddingTop: 6,
   },
   participantChip: {
     alignItems: "center",
