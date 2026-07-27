@@ -13,6 +13,7 @@ import {
   Linking,
   Image,
   Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { api, ApiError, Restaurant, SessionFilterValues, DEFAULT_FILTERS, SessionParticipant } from "@/src/lib/api";
@@ -307,9 +308,14 @@ export default function SessionsScreen() {
 
     return (
       <Screen style={styles.container}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.activeScroll}
+          keyboardShouldPersistTaps="handled"
         >
         <Text style={styles.header}>Group Session</Text>
 
@@ -499,6 +505,7 @@ export default function SessionsScreen() {
           <Text style={styles.leaveText}>Leave session</Text>
         </TouchableOpacity>
         </ScrollView>
+        </KeyboardAvoidingView>
       </Screen>
     );
   }
@@ -797,7 +804,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   activeScroll: {
-    paddingBottom: spacing.lg,
+    paddingBottom: 200,
   },
   matchesSection: {
     backgroundColor: colors.surface,

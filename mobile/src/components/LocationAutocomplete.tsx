@@ -4,11 +4,9 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  Modal,
 } from "react-native";
 import { api } from "@/src/lib/api";
 import { colors } from "@/src/theme/colors";
@@ -31,22 +29,32 @@ export function LocationAutocomplete({ value, onChange, coords }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [dropdownY, setDropdownY] = useState(0);
-  const [dropdownX, setDropdownX] = useState(0);
-  const [dropdownWidth, setDropdownWidth] = useState(0);
-  const wrapperRef = useRef<View>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep input in sync if parent resets value
   useEffect(() => {
     setInputText(value);
   }, [value]);
 
+  const cancelScheduledClose = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    cancelScheduledClose();
+    closeTimeoutRef.current = setTimeout(() => setOpen(false), 1500);
+  };
+
   const fetchSuggestions = (text: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    cancelScheduledClose();
     if (!text.trim()) {
       setSuggestions([]);
-      setOpen(false);
+      scheduleClose();
       return;
     }
     debounceRef.current = setTimeout(async () => {
@@ -56,10 +64,10 @@ export function LocationAutocomplete({ value, onChange, coords }: Props) {
         const res = await api.restaurants.autocomplete(text, bias);
         setSuggestions(res.suggestions);
         if (res.suggestions.length > 0) {
-          measureWrapper();
+          cancelScheduledClose();
           setOpen(true);
         } else {
-          setOpen(false);
+          scheduleClose();
         }
       } catch {
         setSuggestions([]);
@@ -89,16 +97,8 @@ export function LocationAutocomplete({ value, onChange, coords }: Props) {
     setOpen(false);
   };
 
-  const measureWrapper = () => {
-    wrapperRef.current?.measureInWindow((x, y, width, height) => {
-      setDropdownX(x);
-      setDropdownY(y + height + 4);
-      setDropdownWidth(width);
-    });
-  };
-
   return (
-    <View ref={wrapperRef} style={styles.wrapper} onLayout={measureWrapper}>
+    <View style={styles.wrapper}>
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
@@ -124,39 +124,34 @@ export function LocationAutocomplete({ value, onChange, coords }: Props) {
       </View>
 
       {open && (
-        <Modal transparent animationType="none" onRequestClose={() => setOpen(false)}>
-          <TouchableWithoutFeedback onPress={() => setOpen(false)}>
-            <View style={styles.backdrop} />
-          </TouchableWithoutFeedback>
-          <View style={[styles.dropdownModal, { top: dropdownY, left: dropdownX, width: dropdownWidth }]}>
-            <FlatList
-              data={suggestions}
-              keyExtractor={(item) => item.placeId}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item, index }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.suggestion,
-                    index < suggestions.length - 1 && styles.suggestionBorder,
-                  ]}
-                  onPress={() => handleSelect(item)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.suggestionText} numberOfLines={2}>
-                    {item.description}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </Modal>
+        <View style={styles.dropdown}>
+          <FlatList
+            data={suggestions}
+            keyExtractor={(item) => item.placeId}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item, index }) => (
+              <TouchableOpacity
+                style={[
+                  styles.suggestion,
+                  index < suggestions.length - 1 && styles.suggestionBorder,
+                ]}
+                onPress={() => handleSelect(item)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.suggestionText} numberOfLines={2}>
+                  {item.description}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {},
+  wrapper: { position: "relative", zIndex: 10 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -175,15 +170,13 @@ const styles = StyleSheet.create({
   spinner: { marginRight: 12 },
   clearBtn: { paddingHorizontal: 12 },
   clearText: { fontSize: 13, color: colors.textLight },
-  backdrop: {
+  dropdown: {
     position: "absolute",
-    top: 0,
+    top: "100%",
     left: 0,
     right: 0,
-    bottom: 0,
-  },
-  dropdownModal: {
-    position: "absolute",
+    marginTop: 4,
+    maxHeight: 220,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -194,6 +187,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 6,
     elevation: 20,
+    zIndex: 20,
   },
   suggestion: {
     paddingHorizontal: 14,
