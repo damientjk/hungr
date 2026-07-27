@@ -272,6 +272,18 @@ export default function SessionsScreen() {
     setSession(null);
   }
 
+  function confirmLeave() {
+    const message = "You'll be removed from this session and your swipes won't count toward a match.";
+    if (Platform.OS === "web") {
+      if (window.confirm(message)) leaveSessionAction();
+      return;
+    }
+    Alert.alert("Leave session?", message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Leave", style: "destructive", onPress: leaveSessionAction },
+    ]);
+  }
+
   function confirmKick(participant: SessionParticipant, label: string) {
     Alert.alert(
       "Remove member?",
@@ -500,7 +512,7 @@ export default function SessionsScreen() {
 
         <TouchableOpacity
           style={styles.leaveButton}
-          onPress={leaveSessionAction}
+          onPress={confirmLeave}
         >
           <Text style={styles.leaveText}>Leave session</Text>
         </TouchableOpacity>
