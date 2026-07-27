@@ -8,6 +8,7 @@
 
 Milestone 3 submission
 
+See the README pdf for more details
 ---
 
 ## Running Locally
