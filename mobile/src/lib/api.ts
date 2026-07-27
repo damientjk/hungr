@@ -172,7 +172,9 @@ export const api = {
         body: JSON.stringify(payload),
       }),
     restaurants: (id: string) =>
-      request<{ restaurants: Restaurant[] }>(`/api/sessions/${id}/restaurants`),
+      request<{ restaurants: Restaurant[]; swipedRestaurantIds: string[] }>(
+        `/api/sessions/${id}/restaurants`
+      ),
     refreshRestaurants: (
       id: string,
       location: { latitude: number; longitude: number }

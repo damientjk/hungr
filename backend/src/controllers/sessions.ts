@@ -562,8 +562,15 @@ export async function getSessionRestaurants(req: AuthRequest, res: Response) {
     .map((r: any) => ({ ...r, distance_meters: distanceBy.get(r.id) ?? null }))
     .sort((a: any, b: any) => (positionBy.get(a.id) ?? 0) - (positionBy.get(b.id) ?? 0));
 
+  const { data: mySwipes } = await supabase
+    .from("swipes")
+    .select("restaurant_id")
+    .eq("session_id", id)
+    .eq("user_id", req.userId);
+  const swipedRestaurantIds = (mySwipes ?? []).map((s: any) => s.restaurant_id);
+
   await refreshStalePhotos(restaurants);
-  res.json({ restaurants });
+  res.json({ restaurants, swipedRestaurantIds });
 }
 
 export async function refreshSessionRestaurants(req: AuthRequest, res: Response) {

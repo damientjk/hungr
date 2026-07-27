@@ -229,7 +229,7 @@ export default function SwipeScreen() {
     setPhase("swiping");
     setMatchResult(null);
     try {
-      let result: { restaurants: Restaurant[] };
+      let result: { restaurants: Restaurant[]; swipedRestaurantIds?: string[] };
       if (refresh && coords) {
         result = await api.sessions.refreshRestaurants(session.id, {
           latitude: coords.latitude,
@@ -239,7 +239,9 @@ export default function SwipeScreen() {
         result = await api.sessions.restaurants(session.id);
       }
       setRestaurants(result.restaurants);
-      setCurrentIndex(0);
+      const swipedIds = new Set(result.swipedRestaurantIds ?? []);
+      const firstUnswiped = result.restaurants.findIndex((r) => !swipedIds.has(r.id));
+      setCurrentIndex(firstUnswiped === -1 ? result.restaurants.length : firstUnswiped);
     } catch (e: any) {
       setFetchError(e?.message ?? "Failed to load restaurants");
     } finally {
