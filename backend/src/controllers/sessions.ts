@@ -761,7 +761,7 @@ export async function getSessionMatches(req: AuthRequest, res: Response) {
   // Count participants
   const { data: participants } = await supabase
     .from("session_participants")
-    .select("user_id")
+    .select("user_id, last_active_at")
     .eq("session_id", id);
 
   const participantCount = participants?.length ?? 0;
@@ -788,6 +788,15 @@ export async function getSessionMatches(req: AuthRequest, res: Response) {
   const total = restaurantCount ?? 0;
   const doneCount = userIds.filter(uid => (swipesByUser.get(uid) ?? 0) >= total).length;
   const allDone = total > 0 && participantCount > 0 && doneCount >= participantCount;
+
+  // Per-participant swipe state, so the UI can show *who* it's still waiting on.
+  // Deliberately a boolean rather than a count — the exact number of swipes a
+  // member has made isn't anyone else's business.
+  const progress = withDisconnectedFlag(participants ?? []).map((p: any) => ({
+    userId: p.user_id,
+    done: total > 0 && (swipesByUser.get(p.user_id) ?? 0) >= total,
+    disconnected: p.disconnected,
+  }));
 
   // Unanimous matches (every participant liked it)
   const { data: matches, error } = await supabase.rpc("get_session_matches", {
@@ -835,5 +844,5 @@ export async function getSessionMatches(req: AuthRequest, res: Response) {
   await refreshStalePhotos(matches ?? []);
   if (topMatch) await refreshStalePhotos([topMatch]);
 
-  res.json({ matches: matches ?? [], topMatch, participantCount, doneCount, allDone });
+  res.json({ matches: matches ?? [], topMatch, participantCount, doneCount, allDone, progress });
 }

@@ -13,7 +13,15 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
-import { api, ApiError, Restaurant, SwipeDirection } from "@/src/lib/api";
+import {
+  api,
+  ApiError,
+  Restaurant,
+  SwipeDirection,
+  SessionParticipant,
+  ParticipantProgress,
+  joinParticipantProgress,
+} from "@/src/lib/api";
 import { useLocation } from "@/src/hooks/useLocation";
 import { RestaurantCard } from "@/src/components/RestaurantCard";
 import { RestaurantListRow } from "@/src/components/RestaurantListRow";
@@ -35,6 +43,18 @@ const BATCH_SIZE = 20;
 const TAB_BAR_HEIGHT = 64;
 
 type Phase = "swiping" | "loading_results" | "waiting" | "results";
+
+const WAIT_STATUS_LABEL = {
+  done: "Done",
+  swiping: "Still swiping",
+  away: "Away",
+} as const;
+
+const WAIT_STATUS_COLOR = {
+  done: colors.like,
+  swiping: colors.primary,
+  away: colors.textLight,
+} as const;
 
 interface MatchResult {
   matches: Restaurant[];
@@ -102,6 +122,10 @@ export default function SwipeScreen() {
   const [phase, setPhase] = useState<Phase>("swiping");
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
   const [groupProgress, setGroupProgress] = useState({ done: 0, total: 1 });
+  // Identity is fetched once (it's an admin lookup per member); swipe state
+  // rides the existing 4s matches poll.
+  const [participants, setParticipants] = useState<SessionParticipant[]>([]);
+  const [progress, setProgress] = useState<ParticipantProgress[]>([]);
   const [showAllMatches, setShowAllMatches] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
 
@@ -166,12 +190,23 @@ export default function SwipeScreen() {
       try {
         const r = await api.sessions.matches(sessionId);
         setGroupProgress({ done: r.doneCount, total: r.participantCount || 1 });
+        setProgress(r.progress ?? []);
       } catch {}
     }
     pollGroup();
     const interval = setInterval(pollGroup, 4000);
     return () => clearInterval(interval);
   }, [session?.id, session?.status]);
+
+  // Re-fetch identity when the roster size changes, so late joiners get a name
+  // and a face rather than sitting in the header as an unnamed circle.
+  useEffect(() => {
+    if (!session || session.status !== "swiping") return;
+    api.sessions
+      .participants(session.id)
+      .then((r) => setParticipants(r.participants))
+      .catch(() => {});
+  }, [session?.id, session?.status, groupProgress.total]);
 
   useFocusEffect(
     useCallback(() => {
@@ -332,6 +367,8 @@ export default function SwipeScreen() {
   // Keep the ref pointing at the latest swipeCard so PanResponder always calls the current one.
   swipeCardRef.current = swipeCard;
 
+  const participantStatuses = joinParticipantProgress(participants, progress);
+
   if (!session) {
     return (
       <GateView
@@ -409,6 +446,20 @@ export default function SwipeScreen() {
             </Text>
             <Text style={styles.doneLabel}>members finished</Text>
           </View>
+          {participantStatuses.length > 0 && (
+            <View style={styles.waitList}>
+              {participantStatuses.map((p) => (
+                <View key={p.id} style={styles.waitRow}>
+                  <Text style={styles.waitName} numberOfLines={1}>
+                    {p.nickname || p.email?.split("@")[0] || "Guest"}
+                  </Text>
+                  <Text style={[styles.waitStatus, { color: WAIT_STATUS_COLOR[p.status] }]}>
+                    {WAIT_STATUS_LABEL[p.status]}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </Screen>
     );
@@ -553,7 +604,7 @@ export default function SwipeScreen() {
     <Screen edges={["top"]} style={styles.swipeScreen}>
       <SwipeHeader
         inviteCode={session.invite_code}
-        participantCount={groupProgress.total}
+        participants={participantStatuses}
         remaining={restaurants.length - currentIndex}
       />
 
@@ -737,5 +788,27 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.regular,
     color: colors.textLight,
     marginTop: spacing.sm,
+  },
+  waitList: {
+    alignSelf: "stretch",
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    gap: 6,
+  },
+  waitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  waitName: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    color: colors.text,
+  },
+  waitStatus: {
+    fontSize: 14,
+    fontFamily: fontFamily.semiBold,
   },
 });

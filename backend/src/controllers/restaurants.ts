@@ -6,6 +6,7 @@ import { refreshStalePhotos } from "../lib/photoFreshness";
 import { effectiveCuisineFilters, buildSearchTags } from "../lib/dietaryFilters";
 import { upsertRestaurants } from "../lib/restaurantUpsert";
 import { autocompletePlaces } from "../lib/geocode";
+import { touchParticipant } from "../lib/presence";
 import { AuthRequest } from "../middleware/auth";
 
 const AutocompleteSchema = z.object({
@@ -126,6 +127,11 @@ export async function recordSwipe(req: AuthRequest, res: Response) {
     res.status(500).json({ error: "Failed to record swipe" });
     return;
   }
+
+  // Swiping is activity. Without this, presence only stays fresh as a side
+  // effect of the client's /sessions/:id polling, so an active swiper could
+  // show as "Away" to everyone else.
+  await touchParticipant(sessionId, req.userId!).catch(() => {});
 
   res.json({ success: true });
 }

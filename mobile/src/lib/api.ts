@@ -190,6 +190,7 @@ export const api = {
         participantCount: number;
         doneCount: number;
         allDone: boolean;
+        progress: ParticipantProgress[];
       }>(`/api/sessions/${id}/matches`),
     end: (id: string) =>
       request<{ session: Session }>(`/api/sessions/${id}/end`, { method: "PATCH" }),
@@ -269,6 +270,34 @@ export interface SessionParticipant {
   email: string | null;
   isOwner: boolean;
   disconnected: boolean;
+}
+
+/** Live swipe state for one member, polled alongside matches. */
+export interface ParticipantProgress {
+  userId: string;
+  done: boolean;
+  disconnected: boolean;
+}
+
+export type SwipeStatus = "done" | "swiping" | "away";
+
+/** Identity (fetched once) joined with progress (polled), ready to render. */
+export interface ParticipantStatus extends SessionParticipant {
+  status: SwipeStatus;
+}
+
+export function joinParticipantProgress(
+  participants: SessionParticipant[],
+  progress: ParticipantProgress[]
+): ParticipantStatus[] {
+  const byId = new Map(progress.map((p) => [p.userId, p]));
+  return participants.map((p) => {
+    const prog = byId.get(p.id);
+    // Fall back to the identity payload's own flag until the first poll lands.
+    const away = prog?.disconnected ?? p.disconnected;
+    const status: SwipeStatus = prog?.done ? "done" : away ? "away" : "swiping";
+    return { ...p, status };
+  });
 }
 
 export interface SessionSummary {
