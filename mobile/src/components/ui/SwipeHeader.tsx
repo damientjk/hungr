@@ -51,12 +51,25 @@ function formatInviteCode(code: string): string {
   return c;
 }
 
-function Avatar({ p, index }: { p: ParticipantStatus; index: number }) {
+/**
+ * `overlap` pulls the avatar left so the header renders a stacked cluster. The
+ * modal lists avatars in rows, where that margin would shove them off-edge.
+ */
+function Avatar({
+  p,
+  index,
+  overlap = false,
+}: {
+  p: ParticipantStatus;
+  index: number;
+  overlap?: boolean;
+}) {
   return (
     <View
       style={[
         styles.avatar,
-        { borderColor: STATUS_COLOR[p.status], marginLeft: index > 0 ? -10 : 0 },
+        { borderColor: STATUS_COLOR[p.status] },
+        overlap && index > 0 && styles.avatarOverlap,
         p.status === "away" && styles.avatarAway,
       ]}
     >
@@ -99,14 +112,15 @@ export function SwipeHeader({ inviteCode, participants = [], remaining }: Props)
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           {visible.map((p, i) => (
-            <Avatar key={p.id} p={p} index={i} />
+            <Avatar key={p.id} p={p} index={i} overlap />
           ))}
           {overflowed && (
             <View
               style={[
                 styles.avatar,
                 styles.overflow,
-                { borderColor: STATUS_COLOR[hiddenStatus], marginLeft: -10 },
+                styles.avatarOverlap,
+                { borderColor: STATUS_COLOR[hiddenStatus] },
                 hiddenStatus === "away" && styles.avatarAway,
               ]}
             >
@@ -192,6 +206,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     backgroundColor: colors.surface,
     overflow: "hidden",
+  },
+  avatarOverlap: {
+    marginLeft: -10,
   },
   avatarAway: {
     opacity: 0.4,
